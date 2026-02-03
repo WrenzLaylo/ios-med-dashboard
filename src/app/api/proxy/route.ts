@@ -5,7 +5,7 @@ export async function GET(request: Request) {
   const resource = searchParams.get('resource');
   const fields = searchParams.get('fields');
   const limitStart = searchParams.get('limit_start') || '0';
-  const limitPageLength = searchParams.get('limit_page_length') || '20';
+  const limitPageLength = searchParams.get('limit_page_length');
 
   if (!resource || !fields) {
     return NextResponse.json({ error: 'Missing resource or fields' }, { status: 400 });

@@ -1,141 +1,193 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { Search, Filter, ChevronRight, LayoutList, X, Calendar, Users, Activity, RefreshCw, Plus, ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2, Mail, Phone, FileText, Clock, LogOut, Settings, User, ChevronLeft, ChevronDown } from 'lucide-react';
+import { useTheme } from "next-themes";
+import {
+  Search, Filter, ChevronRight, LayoutList, Calendar, Users,
+  Activity, RefreshCw, Plus, ArrowUp, ArrowDown, ArrowUpDown,
+  Edit, Trash2, ChevronLeft, Moon, Sun, ChevronDown, ChevronUp
+} from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-// --- Utility for Tailwind classes ---
+// --- Ein UI Imports ---
+// Make sure these components are installed in @/components/ui/
+import { GlassCard, GlassCardHeader, GlassCardContent, GlassCardTitle, GlassCardDescription } from "@/components/ui/glass-card";
+import { GlassButton } from "@/components/ui/glass-button";
+import { GlassInput } from "@/components/ui/glass-input";
+import { GlassBadge } from "@/components/ui/glass-badge";
+import { GlassDialog, GlassDialogContent, GlassDialogHeader, GlassDialogTitle, GlassDialogDescription, GlassDialogFooter } from "@/components/ui/glass-dialog";
+import { GlassDock } from "@/components/glass-dock";
+import { GlassSkeleton } from "@/components/glass-skeleton";
+
+// --- Utility ---
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-// --- Configuration for your Resources ---
+// --- Custom Hook: Hide Header on Scroll ---
+function useScrollDirection() {
+  const [scrollDirection, setScrollDirection] = useState("up");
+  const [prevScrollY, setPrevScrollY] = useState(0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const currentScrollY = window.scrollY;
+      if (currentScrollY > prevScrollY && currentScrollY > 50) {
+        setScrollDirection("down");
+      } else {
+        setScrollDirection("up");
+      }
+      setPrevScrollY(currentScrollY);
+    };
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, [prevScrollY]);
+
+  return scrollDirection;
+}
+
+// --- Configuration ---
 const RESOURCES = {
   Patient: {
     label: 'Patients',
     fields: JSON.stringify(["name", "patient_name", "first_name", "last_name", "sex", "mobile", "email", "user_id", "age_html"]),
     columns: ['name', 'patient_name', 'mobile', 'email'],
     filterableFields: ['sex', 'email'],
-    createFields: ['first_name', 'last_name', 'sex', 'mobile', 'email', 'user_id', 'age'], // Form shows 'age'
-    fieldMapping: { age: 'age_html' }, // Maps 'age' -> 'age_html' when sending to API
-    icon: Users,
-    quickActions: [
-      { label: 'New Patient', icon: Plus, color: 'blue' },
-      { label: 'Import Patients', icon: FileText, color: 'green' },
-      { label: 'Send SMS', icon: Phone, color: 'purple' }
-    ]
+    createFields: ['first_name', 'last_name', 'sex', 'mobile', 'email', 'user_id', 'age'],
+    fieldMapping: { age: 'age_html' },
+    icon: <Users className="h-5 w-5" />,
+    color: "from-cyan-500 to-blue-500"
   },
   'Patient Appointment': {
     label: 'Appointments',
     fields: JSON.stringify(["name", "patient", "patient_name", "appointment_type", "appointment_date", "appointment_time", "status", "duration", "company", "department"]),
     columns: ['name', 'patient_name', 'appointment_date', 'appointment_time', 'status'],
     filterableFields: ['status', 'appointment_type', 'appointment_date'],
-    createFields: [
-      'naming_series',
-      'company',
-      'appointment_date',
-      'appointment_type',
-      'patient',
-      'duration',
-      'appointment_time',
-      'custom_1',
-      'custom_2',
-      'custom_seat_1',
-      'custom_seat_2',
-      'mode_of_payment',
-      'paid_amount',
-      'notes'
-    ],
+    createFields: ['company', 'appointment_date', 'appointment_type', 'patient', 'duration', 'appointment_time', 'notes'],
     requiredFields: ['company', 'appointment_date', 'appointment_type', 'patient', 'duration', 'appointment_time'],
-    icon: Calendar,
-    quickActions: [
-      { label: 'New Appointment', icon: Plus, color: 'blue' },
-      { label: 'Schedule Batch', icon: Calendar, color: 'green' },
-      { label: 'Send Reminders', icon: Mail, color: 'purple' }
-    ]
+    icon: <Calendar className="h-5 w-5" />,
+    color: "from-purple-500 to-pink-500"
   },
   'Healthcare Practitioner': {
     label: 'Practitioners',
     fields: JSON.stringify(["first_name", "status", "mobile_phone", "name"]),
     columns: ['first_name', 'status', 'mobile_phone', 'name'],
     filterableFields: ['status'],
-    icon: Activity,
-    quickActions: [
-      { label: 'Add Practitioner', icon: Plus, color: 'blue' },
-      { label: 'Manage Schedules', icon: Clock, color: 'green' },
-      { label: 'Update Status', icon: Edit, color: 'purple' }
-    ]
+    icon: <Activity className="h-5 w-5" />,
+    color: "from-emerald-500 to-teal-500"
   },
   'Practitioner Schedule': {
     label: 'Schedules',
     fields: JSON.stringify(["name", "docstatus", "schedule_name"]),
     columns: ['name', 'docstatus', 'schedule_name'],
     filterableFields: ['docstatus'],
-    icon: LayoutList,
-    quickActions: [
-      { label: 'Create Schedule', icon: Plus, color: 'blue' },
-      { label: 'Bulk Update', icon: Edit, color: 'green' },
-      { label: 'Export Schedules', icon: FileText, color: 'purple' }
-    ]
+    icon: <LayoutList className="h-5 w-5" />,
+    color: "from-orange-500 to-amber-500"
   }
 };
 
 type ResourceKey = keyof typeof RESOURCES;
 type SortConfig = { key: string; direction: 'asc' | 'desc' } | null;
 
-// Field type definitions for form inputs
+// Field Types
 const FIELD_TYPES: Record<string, { type: string; options?: string[]; placeholder?: string; default?: any }> = {
   sex: { type: 'select', options: ['Male', 'Female'] },
   email: { type: 'email', placeholder: 'email@example.com' },
   mobile: { type: 'tel', placeholder: '09XX XXX XXXX' },
-  age: { type: 'number', placeholder: 'Age in years' },
-  first_name: { type: 'text', placeholder: 'First name' },
-  last_name: { type: 'text', placeholder: 'Last name' },
-  user_id: { type: 'text', placeholder: 'User ID' },
+  age: { type: 'number', placeholder: 'Age' },
+  first_name: { type: 'text', placeholder: 'First Name' },
+  last_name: { type: 'text', placeholder: 'Last Name' },
   status: { type: 'select', options: ['Active', 'Inactive', 'Disabled'] },
-  department: { type: 'text', placeholder: 'Department name' },
-  title: { type: 'text' },
-  schedule_name: { type: 'text' },
-  mobile_phone: { type: 'tel', placeholder: '09XX XXX XXXX' },
   docstatus: { type: 'select', options: ['0', '1', '2'] },
-  
-  // Patient Appointment fields
-  company: { type: 'text', default: 'ebizolution' },
-  naming_series: { type: 'text', default: 'HLC-APP-.YYYY.-' },
-  appointment_type: { type: 'text', placeholder: 'e.g., Consultation, Follow-up' },
   appointment_date: { type: 'date' },
-  patient: { type: 'text', placeholder: 'Select patient' },
-  duration: { type: 'number', placeholder: 'Duration in minutes', default: '30' },
   appointment_time: { type: 'time' },
-  custom_1: { type: 'number', placeholder: 'Chamber 1' },
-  custom_2: { type: 'number', placeholder: 'Chamber 2' },
-  custom_seat_1: { type: 'text', placeholder: 'Seat 1' },
-  custom_seat_2: { type: 'text', placeholder: 'Seat 2' },
-  mode_of_payment: { type: 'text', placeholder: 'Cash, Card, etc.' },
-  invoiced: { type: 'select', options: ['0', '1'] },
-  paid_amount: { type: 'number', placeholder: '0.00' },
-  referring_practitioner: { type: 'text', placeholder: 'Referring doctor' },
-  appointment_based_on_check_in: { type: 'select', options: ['0', '1'] },
-  notes: { type: 'textarea', placeholder: 'Additional notes' },
+  company: { type: 'text', default: 'ebizolution' },
+  duration: { type: 'number', default: '30' },
+  notes: { type: 'textarea', placeholder: 'Notes...' },
 };
 
 export default function IOSDashboard() {
+  const { theme, setTheme } = useTheme();
+  const scrollDirection = useScrollDirection();
+
+  // --- States ---
+  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState<ResourceKey>('Patient');
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showDock, setShowDock] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
-  const [refreshing, setRefreshing] = useState(false);
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
-  const [showQuickActions, setShowQuickActions] = useState(false);
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
+  const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [showQuickActions, setShowQuickActions] = useState(false);
+
+  // Modal States
   const [selectedRow, setSelectedRow] = useState<any | null>(null);
-  const [showDetailModal, setShowDetailModal] = useState(false);
-  const [patientList, setPatientList] = useState<any[]>([]); // For patient dropdown
-  
-  // Fetch patient list for dropdowns
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error' | 'info', message: string } | null>(null);
+
+  const [editFormData, setEditFormData] = useState<any>({});
+  const [addFormData, setAddFormData] = useState<any>({});
+  const [patientList, setPatientList] = useState<any[]>([]);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const pageSize = 50;
+
+  // Stats
+  const [stats, setStats] = useState({
+    totalPatients: 0,
+    todayAppointments: 0,
+    activePractitioners: 0,
+    pendingSchedules: 0
+  });
+
+  // --- Fix hydration issue ---
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // --- Responsive View Mode ---
+  useEffect(() => {
+    const handleResize = () => {
+      if (window.innerWidth < 768) {
+        setViewMode('card');
+      }
+    };
+    
+    // Check initially
+    handleResize();
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // --- Debounced search for performance ---
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // --- Toast auto-dismiss ---
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
+
+  // --- Effects ---
   useEffect(() => {
     async function fetchPatients() {
       try {
@@ -154,51 +206,73 @@ export default function IOSDashboard() {
     }
     fetchPatients();
   }, []);
-  const [showProfileMenu, setShowProfileMenu] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editFormData, setEditFormData] = useState<any>({});
-  const [addFormData, setAddFormData] = useState<any>({});
-  
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalRecords, setTotalRecords] = useState(0);
-  const [pageSize, setPageSize] = useState(100); // Default to 100 records
 
-  // Fetch data when tab changes or page changes
   useEffect(() => {
     fetchData();
-  }, [activeTab, currentPage, pageSize]);
+    fetchStats();
+  }, [activeTab, currentPage]);
+
+  async function fetchStats() {
+    try {
+      const patientsRes = await fetch(`/api/proxy?${new URLSearchParams({
+        resource: 'Patient',
+        fields: JSON.stringify(["name"]),
+        limit_start: '0',
+        limit_page_length: '999999'
+      })}`);
+      const patientsData = await patientsRes.json();
+
+      const appointmentsRes = await fetch(`/api/proxy?${new URLSearchParams({
+        resource: 'Patient Appointment',
+        fields: JSON.stringify(["name", "appointment_date", "status"]),
+        limit_start: '0',
+        limit_page_length: '999999'
+      })}`);
+      const appointmentsData = await appointmentsRes.json();
+
+      const practitionersRes = await fetch(`/api/proxy?${new URLSearchParams({
+        resource: 'Healthcare Practitioner',
+        fields: JSON.stringify(["name", "status"]),
+        limit_start: '0',
+        limit_page_length: '999999'
+      })}`);
+      const practitionersData = await practitionersRes.json();
+
+      const today = new Date().toISOString().split('T')[0];
+      const todayAppts = appointmentsData.data?.filter((a: any) => a.appointment_date === today).length || 0;
+      const activePracts = practitionersData.data?.filter((p: any) => p.status === 'Active').length || 0;
+
+      setStats({
+        totalPatients: patientsData.data?.length || 0,
+        todayAppointments: todayAppts,
+        activePractitioners: activePracts,
+        pendingSchedules: 0
+      });
+    } catch (err) {
+      console.error('Error fetching stats:', err);
+    }
+  }
 
   async function fetchData() {
     setLoading(true);
     try {
       const config = RESOURCES[activeTab];
-      
-      // First, get the total count
       const countParams = new URLSearchParams({
         resource: activeTab,
         fields: JSON.stringify(["name"]),
         limit_start: '0',
-        limit_page_length: '999999' // Get all to count
+        limit_page_length: '999999'
       });
-      
-      try {
-        const countRes = await fetch(`/api/proxy?${countParams}`);
-        const countResult = await countRes.json();
-        setTotalRecords(countResult.data?.length || 0);
-      } catch (err) {
-        console.error('Error fetching count:', err);
-      }
-      
-      // Then get the actual page data
+      const countRes = await fetch(`/api/proxy?${countParams}`);
+      const countResult = await countRes.json();
+      setTotalRecords(countResult.data?.length || 0);
+
       const params = new URLSearchParams({
         resource: activeTab,
         fields: config.fields,
         limit_start: String((currentPage - 1) * pageSize),
         limit_page_length: String(pageSize)
       });
-
       const res = await fetch(`/api/proxy?${params}`);
       const result = await res.json();
       setData(result.data || []);
@@ -209,887 +283,907 @@ export default function IOSDashboard() {
     }
   }
 
-  // Manual refresh with animation
-  async function handleRefresh() {
-    setRefreshing(true);
-    await fetchData();
-    setTimeout(() => setRefreshing(false), 600);
-  }
-
-  // Sort handler
-  const handleSort = (key: string) => {
-    setSortConfig(current => {
-      if (!current || current.key !== key) {
-        return { key, direction: 'asc' };
-      }
-      if (current.direction === 'asc') {
-        return { key, direction: 'desc' };
-      }
-      return null;
-    });
-  };
-
-  // Get unique values for filter fields
-  const getFilterOptions = (field: string) => {
-    const values = data.map(item => item[field]).filter(Boolean);
-    return [...new Set(values)];
-  };
-
-  // Filter and Sort Logic
+  // --- Filter Logic ---
   const filteredAndSortedData = useMemo(() => {
     let result = data;
-
-    if (searchTerm) {
-      const lowerTerm = searchTerm.toLowerCase();
+    if (debouncedSearchTerm) {
+      const lowerTerm = debouncedSearchTerm.toLowerCase();
       result = result.filter(item =>
-        Object.values(item).some(val =>
-          String(val).toLowerCase().includes(lowerTerm)
-        )
+        Object.values(item).some(val => String(val).toLowerCase().includes(lowerTerm))
       );
     }
-
     Object.entries(activeFilters).forEach(([field, value]) => {
-      if (value) {
-        result = result.filter(item => item[field] === value);
-      }
+      if (value) result = result.filter(item => item[field] === value);
     });
-
     if (sortConfig) {
       result = [...result].sort((a, b) => {
         const aVal = a[sortConfig.key];
         const bVal = b[sortConfig.key];
-        
         if (aVal === bVal) return 0;
-        
-        const comparison = aVal < bVal ? -1 : 1;
-        return sortConfig.direction === 'asc' ? comparison : -comparison;
+        return sortConfig.direction === 'asc'
+          ? (aVal < bVal ? -1 : 1)
+          : (aVal < bVal ? 1 : -1);
       });
     }
-
     return result;
-  }, [data, searchTerm, activeFilters, sortConfig]);
+  }, [data, debouncedSearchTerm, activeFilters, sortConfig]);
 
-  const toggleFilter = (field: string, value: string) => {
-    setActiveFilters(prev => ({
-      ...prev,
-      [field]: prev[field] === value ? '' : value
-    }));
+  const handleSort = (key: string) => {
+    setSortConfig(current =>
+      (current?.key === key && current.direction === 'asc')
+        ? { key, direction: 'desc' }
+        : { key, direction: 'asc' }
+    );
   };
 
-  const clearFilters = () => {
-    setActiveFilters({});
-    setSearchTerm('');
-    setSortConfig(null);
-  };
-
-  const openDetailModal = (row: any) => {
+  // --- Actions ---
+  const openDetail = (row: any) => {
     setSelectedRow(row);
-    setShowDetailModal(true);
+    setIsDetailOpen(true);
   };
 
-  const openEditModal = (row: any) => {
+  const openEdit = (row: any) => {
     setEditFormData({ ...row });
-    setShowEditModal(true);
-    setShowDetailModal(false);
+    setIsEditOpen(true);
+    setIsDetailOpen(false);
   };
 
-  const openAddModal = () => {
+  const openAdd = () => {
     const config = RESOURCES[activeTab];
     const emptyForm: any = {};
-    // Use createFields if available, otherwise fall back to columns
-    const fieldsToUse = (config as any).createFields || config.columns;
-    fieldsToUse.forEach((col: string) => {
-      // Set default values if defined
+    const fields = (config as any).createFields || config.columns;
+    fields.forEach((col: string) => {
       const fieldDef = FIELD_TYPES[col];
-      if (fieldDef?.default !== undefined) {
-        emptyForm[col] = fieldDef.default;
-      } else {
-        emptyForm[col] = '';
-      }
+      emptyForm[col] = fieldDef?.default !== undefined ? fieldDef.default : '';
     });
     setAddFormData(emptyForm);
-    setShowAddModal(true);
-    setShowQuickActions(false);
+    setIsAddOpen(true);
   };
 
-  const handleEditSubmit = async () => {
-    try {
-      const response = await fetch('/api/update', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          resource: activeTab,
-          name: editFormData.name,
-          data: editFormData
-        })
-      });
-
-      if (response.ok) {
-        alert('Record updated successfully!');
-        setShowEditModal(false);
-        // Refresh the data to get computed fields like full_name
-        await fetchData();
-      } else {
-        const result = await response.json();
-        alert(`Failed to update record: ${result.error?.message || 'Unknown error'}`);
-      }
-    } catch (error) {
-      console.error('Update error:', error);
-      alert('Error updating record');
-    }
-  };
-
-  const handleAddSubmit = async () => {
-    const config = RESOURCES[activeTab] as any;
-    const requiredFields = config.requiredFields || [];
-    
-    // Basic validation for Patient
-    if (activeTab === 'Patient') {
-      if (!addFormData.first_name || !addFormData.last_name || !addFormData.sex) {
-        alert('Please fill in all required fields: First Name, Last Name, and Sex');
-        return;
-      }
+  const handleDelete = async () => {
+    if (!selectedRow || !selectedRow.name) {
+      showToast('error', 'No record selected or record ID is missing');
+      return;
     }
     
-    // Validation for Patient Appointment
-    if (activeTab === 'Patient Appointment') {
-      const missingFields = requiredFields.filter((field: string) => !addFormData[field]);
-      if (missingFields.length > 0) {
-        alert(`Please fill in all required fields: ${missingFields.map((f: string) => f.replace(/_/g, ' ')).join(', ')}`);
-        return;
-      }
-    }
-
+    setShowDeleteConfirm(false);
+    
     try {
-      // Remove empty fields
-      const cleanData = Object.fromEntries(
-        Object.entries(addFormData).filter(([_, value]) => value !== '')
-      );
-
-      // Apply field mapping if exists (e.g., age -> age_html)
-      const mappedData: any = {};
+      showToast('info', 'Deleting record...');
       
-      Object.entries(cleanData).forEach(([key, value]) => {
-        // Check if this field needs to be mapped to a different API field name
-        const apiFieldName = config.fieldMapping?.[key] || key;
-        mappedData[apiFieldName] = value;
-      });
-
-      console.log('Submitting data:', mappedData);
-
-      const response = await fetch('/api/create', {
+      const response = await fetch('/api/delete', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
         body: JSON.stringify({
           resource: activeTab,
-          data: mappedData
+          name: selectedRow.name
         })
       });
 
       const result = await response.json();
 
-      if (response.ok) {
-        alert('Record created successfully!');
-        setShowAddModal(false);
-        fetchData();
-      } else {
-        console.error('Server error:', result);
-        alert(`Failed to create record: ${result.error?.message || result.message || result.error || 'Unknown error'}`);
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to delete record');
       }
+
+      showToast('success', 'Record deleted successfully!');
+      setIsDetailOpen(false);
+      setSelectedRow(null);
+      fetchData();
+      fetchStats();
     } catch (error) {
-      console.error('Create error:', error);
-      alert('Error creating record. Please check the console for details.');
+      console.error('Delete error:', error);
+      showToast('error', error instanceof Error ? error.message : 'Failed to delete record');
     }
   };
 
-  const handleDeleteRecord = async (recordName: string) => {
-    if (!confirm('Are you sure you want to delete this record?')) return;
+  const handleSave = async () => {
+    const isCreating = isAddOpen;
+    const currentData = isCreating ? addFormData : editFormData;
+
+    if (!currentData || Object.keys(currentData).length === 0) {
+      showToast('error', 'Please fill in the form fields');
+      return;
+    }
 
     try {
-      const response = await fetch('/api/delete', {
+      showToast('info', isCreating ? 'Creating record...' : 'Updating record...');
+
+      const response = await fetch('/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           resource: activeTab,
-          name: recordName
+          action: isCreating ? 'create' : 'update',
+          data: currentData,
+          name: isCreating ? undefined : currentData.name
         })
       });
 
-      if (response.ok) {
-        alert('Record deleted successfully!');
-        setShowDetailModal(false);
-        fetchData();
-      } else {
-        alert('Failed to delete record');
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.message || 'Failed to save changes');
       }
+
+      setIsAddOpen(false);
+      setIsEditOpen(false);
+      setAddFormData({});
+      setEditFormData({});
+
+      showToast('success', isCreating ? 'Record created successfully!' : 'Record updated successfully!');
+
+      fetchData();
+      fetchStats();
+
     } catch (error) {
-      console.error('Delete error:', error);
-      alert('Error deleting record');
+      console.error('Save error:', error);
+      showToast('error', error instanceof Error ? error.message : 'Failed to save changes');
     }
   };
 
-  const totalPages = Math.ceil(totalRecords / pageSize);
-  const hasActiveFilters = Object.values(activeFilters).some(v => v) || searchTerm || sortConfig;
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    setToastMessage({ type, message });
+  };
+
+  const toggleRowSelection = (index: number) => {
+    const newSelection = new Set(selectedRows);
+    if (newSelection.has(index)) {
+      newSelection.delete(index);
+    } else {
+      newSelection.add(index);
+    }
+    setSelectedRows(newSelection);
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedRows.size === 0) return;
+
+    try {
+      showToast('info', `Deleting ${selectedRows.size} records...`);
+
+      const deletePromises = Array.from(selectedRows).map(async (index) => {
+        const row = filteredAndSortedData[index];
+        const response = await fetch('/api/delete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            resource: activeTab,
+            name: row.name
+          })
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          throw new Error(result.message || 'Failed to delete record');
+        }
+      });
+
+      await Promise.all(deletePromises);
+
+      showToast('success', `${selectedRows.size} records deleted successfully!`);
+      setSelectedRows(new Set());
+      fetchData();
+      fetchStats();
+    } catch (error) {
+      console.error('Batch delete error:', error);
+      showToast('error', error instanceof Error ? error.message : 'Failed to delete some records');
+    }
+  };
+
+  const dockItems = (Object.keys(RESOURCES) as ResourceKey[]).map(key => ({
+    id: key,
+    label: RESOURCES[key].label,
+    icon: RESOURCES[key].icon,
+    active: activeTab === key,
+    onClick: () => {
+      setActiveTab(key);
+      setCurrentPage(1);
+      setSearchTerm('');
+    }
+  }));
+
+  const getStatusVariant = (status: any) => {
+    if (['Active', 'Open', 1].includes(status)) return 'success';
+    if (['Closed', 0].includes(status)) return 'outline';
+    return 'default';
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#F2F2F7] via-[#E5E5EA] to-[#F2F2F7] text-slate-900 font-sans pb-10">
-      
-      {/* iOS Header with darker blue gradient */}
-      <header className="sticky top-0 z-50 bg-white/70 backdrop-blur-2xl border-b border-slate-200/50 px-6 pt-12 pb-4 shadow-sm">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-2xl bg-gradient-to-br from-[#0066CC] to-[#4A5FCC] flex items-center justify-center shadow-lg transform hover:scale-110 transition-transform duration-300 ease-out">
-              <Activity className="h-5 w-5 text-white" />
+    <div className="min-h-screen w-full bg-background transition-colors duration-300 pb-32">
+
+      {/* --- Sticky Header with Enhanced Liquid Glass Effect --- */}
+      <header
+        className={cn(
+          "sticky top-0 z-40 px-6 py-5 transition-transform duration-300 ease-in-out",
+          "bg-white/40 dark:bg-slate-900/40 backdrop-blur-2xl",
+          "border-b border-gray-200/30 dark:border-white/5",
+          "shadow-xl shadow-black/5 dark:shadow-black/30",
+          "before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/20 before:to-transparent dark:before:from-white/5 dark:before:to-transparent before:pointer-events-none",
+          scrollDirection === "down" ? "-translate-y-full" : "translate-y-0"
+        )}
+      >
+        <div className="max-w-7xl mx-auto flex items-center justify-between mb-4 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className={cn(
+              "h-14 w-14 rounded-2xl flex items-center justify-center backdrop-blur-sm",
+              "bg-gradient-to-br shadow-2xl",
+              "border-2 border-white/30 dark:border-white/10",
+              RESOURCES[activeTab].color,
+              "relative overflow-hidden group",
+              "hover:scale-105 transition-all duration-500"
+            )}>
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1500"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent opacity-50"></div>
+              <Activity className="h-7 w-7 text-white relative z-10 drop-shadow-lg" />
             </div>
-            <h1 className="text-3xl font-bold tracking-tight bg-gradient-to-r from-slate-900 to-slate-600 bg-clip-text text-transparent">
-              Health Data
-            </h1>
-          </div>
-          
-          {/* Profile Menu */}
-          <div className="relative">
-            <button
-              onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="h-8 w-8 rounded-full bg-gradient-to-br from-[#0066CC] to-[#4A5FCC] flex items-center justify-center text-white font-semibold text-xs shadow-lg hover:shadow-xl transform hover:scale-110 transition-all duration-300 ease-out cursor-pointer"
-            >
-              JD
-            </button>
-            
-            {showProfileMenu && (
-              <div className="absolute top-12 right-0 bg-white/95 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50 p-2 min-w-[200px] animate-in slide-in-from-top-5 fade-in duration-300">
-                <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-50 transition-all duration-200 text-left">
-                  <User className="h-4 w-4 text-slate-600" />
-                  <span className="text-sm font-medium text-slate-700">Profile</span>
-                </button>
-                <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-50 transition-all duration-200 text-left">
-                  <Settings className="h-4 w-4 text-slate-600" />
-                  <span className="text-sm font-medium text-slate-700">Settings</span>
-                </button>
-                <div className="h-px bg-slate-200 my-2"></div>
-                <button className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 transition-all duration-200 text-left">
-                  <LogOut className="h-4 w-4 text-red-600" />
-                  <span className="text-sm font-medium text-red-600">Logout</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-4 mt-6 space-y-6">
-        
-        {/* iOS Segmented Control with darker blue */}
-        <div className="bg-white/60 backdrop-blur-xl p-1.5 rounded-2xl flex space-x-1 overflow-x-auto no-scrollbar shadow-sm border border-slate-200/50">
-          {(Object.keys(RESOURCES) as ResourceKey[]).map((key) => {
-            const Icon = RESOURCES[key].icon;
-            return (
-              <button
-                key={key}
-                onClick={() => {
-                  setActiveTab(key);
-                  setSearchTerm('');
-                  setActiveFilters({});
-                  setSortConfig(null);
-                  setCurrentPage(1);
-                }}
-                className={cn(
-                  "flex-1 px-4 py-2.5 text-sm font-medium rounded-xl whitespace-nowrap flex items-center justify-center gap-2 relative overflow-hidden",
-                  "transition-all duration-500 ease-out", // Smooth transition
-                  activeTab === key 
-                    ? "text-white shadow-lg scale-105 z-10" 
-                    : "text-slate-600 hover:text-slate-900 hover:bg-white/50 hover:scale-102"
-                )}
-              >
-                {/* Animated background gradient */}
-                {activeTab === key && (
-                  <span className="absolute inset-0 bg-gradient-to-r from-[#0066CC] to-[#4A5FCC] animate-in slide-in-from-left-full duration-500 ease-out"></span>
-                )}
-                <Icon className="h-4 w-4 relative z-10" />
-                <span className="relative z-10">{RESOURCES[key].label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative group">
-          <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-            <Search className="h-5 w-5 text-slate-400 group-focus-within:text-[#0066CC] transition-colors duration-300" />
-          </div>
-          <input
-            type="text"
-            placeholder={`Search ${RESOURCES[activeTab].label}...`}
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full bg-white/60 backdrop-blur-xl hover:bg-white/80 focus:bg-white transition-all duration-300 pl-12 pr-4 py-4 rounded-2xl text-slate-900 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-[#0066CC]/30 focus:shadow-lg focus:scale-[1.02] transform border border-slate-200/50"
-          />
-          {searchTerm && (
-            <button
-              onClick={() => setSearchTerm('')}
-              className="absolute inset-y-0 right-4 flex items-center hover:scale-110 transition-transform duration-200"
-            >
-              <X className="h-4 w-4 text-slate-400 hover:text-slate-600" />
-            </button>
-          )}
-        </div>
-
-        {/* Action Bar */}
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex gap-2 flex-wrap">
-            {hasActiveFilters && (
-              <button
-                onClick={clearFilters}
-                className="px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl text-sm font-medium transition-all duration-300 transform hover:scale-105 flex items-center gap-2 border border-red-200"
-              >
-                <X className="h-4 w-4" />
-                Clear All
-              </button>
-            )}
-            {Object.entries(activeFilters).map(([field, value]) => 
-              value ? (
-                <span
-                  key={field}
-                  className="px-3 py-2 bg-blue-50 text-blue-700 rounded-xl text-sm font-medium flex items-center gap-2 border border-blue-200 animate-in fade-in slide-in-from-left-5 duration-300"
-                >
-                  {field}: {value}
-                  <button
-                    onClick={() => toggleFilter(field, value)}
-                    className="hover:scale-110 transition-transform"
-                  >
-                    <X className="h-3 w-3" />
-                  </button>
-                </span>
-              ) : null
-            )}
-            {sortConfig && (
-              <span className="px-3 py-2 bg-purple-50 text-purple-700 rounded-xl text-sm font-medium flex items-center gap-2 border border-purple-200 animate-in fade-in slide-in-from-left-5 duration-300">
-                Sorted: {sortConfig.key} {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                <button
-                  onClick={() => setSortConfig(null)}
-                  className="hover:scale-110 transition-transform"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </span>
-            )}
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-gray-900 via-gray-700 to-gray-900 dark:from-white dark:via-gray-300 dark:to-white bg-clip-text text-transparent drop-shadow-sm">
+                Health OS
+              </h1>
+              <p className="text-xs text-gray-600 dark:text-gray-400 font-medium tracking-wider">
+                Advanced Healthcare Dashboard
+              </p>
+            </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
             <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-3 bg-white/60 backdrop-blur-xl hover:bg-white border border-slate-200/50 rounded-xl transition-all duration-300 transform hover:scale-110 disabled:opacity-50 shadow-sm"
-            >
-              <RefreshCw className={cn("h-5 w-5 text-[#0066CC]", refreshing && "animate-spin")} />
-            </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
               className={cn(
-                "p-3 rounded-xl transition-all duration-300 transform hover:scale-110 shadow-sm border",
-                showFilters 
-                  ? "bg-gradient-to-r from-[#0066CC] to-[#4A5FCC] text-white border-transparent" 
-                  : "bg-white/60 backdrop-blur-xl hover:bg-white text-[#0066CC] border-slate-200/50"
+                "p-3 rounded-2xl transition-all duration-500",
+                "bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl",
+                "border-2 border-white/40 dark:border-white/10",
+                "hover:bg-white/90 dark:hover:bg-slate-800/90",
+                "hover:scale-110 hover:shadow-2xl hover:border-white/60 dark:hover:border-white/20",
+                "text-gray-800 dark:text-foreground",
+                "group relative overflow-hidden",
+                "shadow-lg"
+              )}
+              suppressHydrationWarning
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              {mounted ? (
+                theme === 'dark' ? (
+                  <Sun className="h-5 w-5 relative z-10 drop-shadow" />
+                ) : (
+                  <Moon className="h-5 w-5 relative z-10 drop-shadow" />
+                )
+              ) : (
+                <div className="h-5 w-5" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Toolbar */}
+        <div className="max-w-7xl mx-auto flex gap-3 relative z-10">
+          <div className="relative flex-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-600 dark:text-gray-400 z-10 drop-shadow-sm" />
+            <input
+              type="text"
+              placeholder={`Search ${RESOURCES[activeTab].label}...`}
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className={cn(
+                "w-full h-11 pl-11 pr-4 rounded-2xl transition-all duration-500",
+                "bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl",
+                "border-2 border-white/40 dark:border-white/10",
+                "focus:bg-white/90 dark:focus:bg-slate-800/90",
+                "focus:border-primary/50 focus:shadow-2xl focus:scale-[1.02]",
+                "text-gray-900 dark:text-foreground text-sm",
+                "placeholder:text-gray-500 dark:placeholder:text-gray-400",
+                "shadow-lg hover:shadow-xl",
+                "outline-none"
+              )}
+            />
+          </div>
+
+          {[
+            { icon: Filter, active: showFilters, onClick: () => setShowFilters(!showFilters) },
+            { icon: RefreshCw, active: false, onClick: () => fetchData(), spinning: loading },
+            { icon: LayoutList, active: false, onClick: () => setViewMode(v => v === 'table' ? 'card' : 'table') }
+          ].map((btn, idx) => (
+            <button
+              key={idx}
+              onClick={btn.onClick}
+              className={cn(
+                "h-11 w-11 rounded-2xl transition-all duration-500 flex items-center justify-center",
+                "bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl",
+                "border-2 border-white/40 dark:border-white/10",
+                "hover:bg-white/90 dark:hover:bg-slate-800/90",
+                "text-gray-800 dark:text-foreground",
+                "shadow-lg hover:shadow-2xl hover:scale-110 hover:border-white/60 dark:hover:border-white/20",
+                "relative overflow-hidden group",
+                btn.active && "bg-primary/30 dark:bg-primary/30 border-primary/50 text-primary shadow-2xl scale-105"
               )}
             >
-              <Filter className="h-5 w-5" />
+              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+              <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <btn.icon className={cn("h-4 w-4 relative z-10 drop-shadow", btn.spinning && "animate-spin")} />
             </button>
-            <button
-              onClick={() => setViewMode(viewMode === 'table' ? 'card' : 'table')}
-              className="p-3 bg-white/60 backdrop-blur-xl hover:bg-white border border-slate-200/50 rounded-xl transition-all duration-300 transform hover:scale-110 text-[#0066CC] shadow-sm"
-            >
-              <LayoutList className="h-5 w-5" />
-            </button>
-          </div>
+          ))}
         </div>
 
         {/* Filter Panel */}
         {showFilters && (
-          <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-slate-200/50 p-6 animate-in slide-in-from-top-5 fade-in duration-300">
-            <h3 className="text-lg font-semibold mb-4 text-slate-900">Filter Options</h3>
-            <div className="space-y-4">
-              {RESOURCES[activeTab].filterableFields.map(field => (
-                <div key={field}>
-                  <label className="block text-sm font-medium text-slate-700 mb-2 capitalize">
-                    {field.replace(/_/g, ' ')}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {getFilterOptions(field).map(option => (
+          <div className="max-w-7xl mx-auto mt-4 animate-in slide-in-from-top-2">
+            <GlassCard className="bg-accent/30 dark:bg-accent/20 border-border/70">
+              <GlassCardContent className="p-4 flex flex-wrap gap-4">
+                {RESOURCES[activeTab].filterableFields.map(field => {
+                  const uniqueValues = [...new Set(data.map(i => i[field]).filter(Boolean))];
+                  return (
+                    <div key={field} className="space-y-1">
+                      <label className="text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-muted-foreground">{field.replace(/_/g, ' ')}</label>
+                      <div className="flex flex-wrap gap-2">
+                        {uniqueValues.map((val: any) => (
+                          <GlassBadge
+                            key={val}
+                            variant={activeFilters[field] === val ? 'default' : 'outline'}
+                            className="cursor-pointer hover:scale-105 transition-transform border-gray-300 dark:border-border/50 text-gray-900 dark:text-foreground"
+                            onClick={() => setActiveFilters(prev => ({ ...prev, [field]: prev[field] === val ? '' : val }))}
+                          >
+                            {val}
+                          </GlassBadge>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+                {Object.keys(activeFilters).length > 0 && (
+                  <GlassButton size="sm" variant="ghost" onClick={() => setActiveFilters({})} className="text-destructive hover:text-destructive hover:bg-destructive/10">
+                    Clear Filters
+                  </GlassButton>
+                )}
+              </GlassCardContent>
+            </GlassCard>
+          </div>
+        )}
+      </header>
+
+      {/* --- Stats Dashboard --- */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <GlassCard className="overflow-hidden border-border/70 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/5 dark:to-blue-500/5">
+            <GlassCardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Total Patients</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-foreground mt-2">{stats.totalPatients.toLocaleString()}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                    <ArrowUp className="h-3 w-3" /> +12% from last month
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-lg">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+
+          <GlassCard className="overflow-hidden border-border/70 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-gradient-to-br from-purple-500/10 to-pink-500/10 dark:from-purple-500/5 dark:to-pink-500/5">
+            <GlassCardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Today's Appointments</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-foreground mt-2">{stats.todayAppointments}</p>
+                  <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
+                    <ArrowUp className="h-3 w-3" /> +5% from yesterday
+                  </p>
+                </div>
+                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
+                  <Calendar className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+
+          <GlassCard className="overflow-hidden border-border/70 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5">
+            <GlassCardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Active Practitioners</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-foreground mt-2">{stats.activePractitioners}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">All systems operational</p>
+                </div>
+                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg">
+                  <Activity className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+
+          <GlassCard className="overflow-hidden border-border/70 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-gradient-to-br from-orange-500/10 to-amber-500/10 dark:from-orange-500/5 dark:to-amber-500/5">
+            <GlassCardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Total Schedules</p>
+                  <p className="text-3xl font-bold text-gray-900 dark:text-foreground mt-2">{totalRecords.toLocaleString()}</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Across all resources</p>
+                </div>
+                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
+                  <LayoutList className="h-6 w-6 text-white" />
+                </div>
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+        </div>
+      </div>
+
+      {/* --- Main Content --- */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
+        <GlassCard className="overflow-hidden min-h-[600px] border-border/70 shadow-lg bg-card/80 dark:bg-card/50">
+          <GlassCardHeader className="border-b border-border/70 bg-accent/10 dark:bg-accent/5 px-6 py-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <GlassCardTitle className="text-gray-900 dark:text-foreground/90">{RESOURCES[activeTab].label}</GlassCardTitle>
+                <GlassCardDescription className="text-gray-600 dark:text-muted-foreground/80">
+                  {selectedRows.size > 0 ? (
+                    <span className="flex items-center gap-2">
+                      {selectedRows.size} selected
                       <button
-                        key={option}
-                        onClick={() => toggleFilter(field, String(option))}
-                        className={cn(
-                          "px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300 transform hover:scale-105 border",
-                          activeFilters[field] === option
-                            ? "bg-gradient-to-r from-[#0066CC] to-[#4A5FCC] text-white border-transparent shadow-md"
-                            : "bg-white hover:bg-slate-50 text-slate-700 border-slate-200"
-                        )}
+                        onClick={handleBatchDelete}
+                        className="text-xs text-red-600 dark:text-red-400 hover:underline"
                       >
-                        {option}
+                        Delete selected
                       </button>
+                    </span>
+                  ) : (
+                    `${filteredAndSortedData.length} Records`
+                  )}
+                </GlassCardDescription>
+              </div>
+              <div className="flex items-center gap-1 bg-white/60 dark:bg-accent/30 rounded-lg p-1 border border-gray-200 dark:border-border/50">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-accent/60 rounded-md disabled:opacity-30 transition-colors text-gray-800 dark:text-foreground"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-xs font-mono px-2 text-gray-900 dark:text-foreground/80">{currentPage}</span>
+                <button
+                  disabled={data.length < pageSize}
+                  onClick={() => setCurrentPage(p => p + 1)}
+                  className="p-2 hover:bg-gray-200 dark:hover:bg-accent/60 rounded-md disabled:opacity-30 transition-colors text-gray-800 dark:text-foreground"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+          </GlassCardHeader>
+
+          <GlassCardContent className="p-0">
+            {loading ? (
+              <div className="p-8 space-y-4">
+                <GlassSkeleton className="h-12 w-full rounded-xl" />
+                <GlassSkeleton className="h-12 w-full rounded-xl" />
+              </div>
+            ) : filteredAndSortedData.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-96 text-muted-foreground p-8">
+                <div className="relative mb-6">
+                  <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full"></div>
+                  <Search className="h-24 w-24 opacity-20 relative z-10" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-foreground mb-2">
+                  {searchTerm || Object.keys(activeFilters).length > 0 ? 'No results found' : `No ${RESOURCES[activeTab].label.toLowerCase()} yet`}
+                </h3>
+                <p className="text-sm text-gray-600 dark:text-muted-foreground mb-6 text-center max-w-md">
+                  {searchTerm || Object.keys(activeFilters).length > 0
+                    ? 'Try adjusting your search or filters to find what you\'re looking for.'
+                    : `Get started by adding your first ${RESOURCES[activeTab].label.toLowerCase().slice(0, -1)}.`
+                  }
+                </p>
+                {!searchTerm && Object.keys(activeFilters).length === 0 && (
+                  <GlassButton onClick={openAdd} className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add {RESOURCES[activeTab].label.slice(0, -1)}
+                  </GlassButton>
+                )}
+                {(searchTerm || Object.keys(activeFilters).length > 0) && (
+                  <GlassButton variant="outline" onClick={() => { setSearchTerm(''); setActiveFilters({}); }}>
+                    Clear filters
+                  </GlassButton>
+                )}
+              </div>
+            ) : viewMode === 'table' ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left">
+                  <thead className="text-[11px] text-gray-700 dark:text-muted-foreground uppercase bg-gray-100 dark:bg-accent/10 border-b border-gray-300 dark:border-border">
+                    <tr>
+                      <th className="px-4 py-3 w-12">
+                        <input
+                          type="checkbox"
+                          checked={selectedRows.size === filteredAndSortedData.length && filteredAndSortedData.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedRows(new Set(filteredAndSortedData.map((_, i) => i)));
+                            } else {
+                              setSelectedRows(new Set());
+                            }
+                          }}
+                          className="h-4 w-4 rounded border-gray-300 dark:border-border text-primary focus:ring-2 focus:ring-primary/50"
+                        />
+                      </th>
+                      {RESOURCES[activeTab].columns.map(col => (
+                        <th
+                          key={col}
+                          // Responsive hiding: hide non-essential columns on smaller screens
+                          className={cn(
+                            "px-4 py-3 font-semibold cursor-pointer hover:text-primary transition-colors whitespace-nowrap",
+                            (col === 'mobile' || col === 'email' || col === 'status') && "hidden md:table-cell"
+                          )}
+                          onClick={() => handleSort(col)}
+                        >
+                          <div className="flex items-center gap-1">
+                            {col.replace(/_/g, ' ')}
+                            {sortConfig?.key === col ? (
+                              sortConfig.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
+                            ) : <ArrowUpDown className="h-3 w-3 opacity-30" />}
+                          </div>
+                        </th>
+                      ))}
+                      <th className="px-4 py-3 text-right w-16">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredAndSortedData.map((row, i) => (
+                      <tr key={i} className={cn(
+                        "hover:bg-accent/50 dark:hover:bg-accent/40 transition-colors group cursor-pointer",
+                        selectedRows.has(i) && "bg-primary/10 dark:bg-primary/10"
+                      )}>
+                        <td className="px-4 py-3">
+                          <input
+                            type="checkbox"
+                            checked={selectedRows.has(i)}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              toggleRowSelection(i);
+                            }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="h-4 w-4 rounded border-gray-300 dark:border-border text-primary focus:ring-2 focus:ring-primary/50"
+                          />
+                        </td>
+                        {RESOURCES[activeTab].columns.map(col => (
+                          <td 
+                            key={`${i}-${col}`} 
+                            className={cn(
+                              "px-4 py-3 text-foreground whitespace-nowrap",
+                              (col === 'mobile' || col === 'email' || col === 'status') && "hidden md:table-cell"
+                            )}
+                            onClick={() => openDetail(row)}
+                          >
+                            {(col === 'status' || col === 'docstatus') ? (
+                              <GlassBadge variant={getStatusVariant(row[col])} className="text-gray-900 dark:text-foreground">
+                                {row[col] === 1 ? 'Submitted' : row[col] === 0 ? 'Draft' : row[col]}
+                              </GlassBadge>
+                            ) : (
+                              <span className="text-gray-900 dark:text-foreground/90">{row[col]}</span>
+                            )}
+                          </td>
+                        ))}
+                        <td className="px-4 py-3 text-right" onClick={() => openDetail(row)}>
+                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors inline-block" />
+                        </td>
+                      </tr>
                     ))}
-                  </div>
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                {filteredAndSortedData.map((row, i) => (
+                  <GlassCard
+                    key={i}
+                    className="cursor-pointer hover:bg-accent/50 dark:hover:bg-accent/30 hover:scale-[1.02] transition-all duration-300 border-border/70"
+                    onClick={() => openDetail(row)}
+                  >
+                    <GlassCardContent className="p-4 space-y-2">
+                      {RESOURCES[activeTab].columns.map(col => (
+                        <div key={col} className="flex justify-between items-start border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                          <span className="text-[11px] font-bold text-gray-600 dark:text-muted-foreground uppercase tracking-wide">{col.replace(/_/g, ' ')}</span>
+                          <span className="text-sm font-medium text-right text-gray-900 dark:text-foreground/90 truncate max-w-[60%]">{row[col]}</span>
+                        </div>
+                      ))}
+                    </GlassCardContent>
+                  </GlassCard>
+                ))}
+              </div>
+            )}
+          </GlassCardContent>
+        </GlassCard>
+      </main>
+
+      {/* --- Dock Navigation with Toggle (FIXED POSITIONING) --- */}
+      {/* Changed absolute centering to flex centering to avoid transform conflicts with tooltips */}
+      <div className="fixed bottom-6 inset-x-0 z-50 flex flex-col items-center gap-3 pointer-events-none">
+
+        {/* The Dock */}
+        <div className={cn(
+          "pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] origin-bottom",
+          showDock ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4 pointer-events-none"
+        )}>
+          <GlassDock
+            items={dockItems}
+            glassIntensity="low"
+            magnification={1.1}
+            className="!bg-white/40 dark:!bg-slate-900/40 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 shadow-2xl rounded-2xl"
+          />
+        </div>
+
+        {/* Toggle Button - Liquid Glass Styled */}
+        <button
+          onClick={() => setShowDock(!showDock)}
+          className={cn(
+            "pointer-events-auto h-10 w-10 rounded-full transition-all duration-500 flex items-center justify-center",
+            "bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl",
+            "border-2 border-white/40 dark:border-white/10",
+            "hover:bg-white/90 dark:hover:bg-slate-800/90",
+            "text-gray-800 dark:text-foreground",
+            "shadow-lg hover:shadow-2xl hover:scale-110 hover:border-white/60 dark:hover:border-white/20",
+            "group relative overflow-hidden"
+          )}
+        >
+           {/* Shimmer Effect Layers */}
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+          
+          {showDock ? 
+            <ChevronDown className="h-5 w-5 relative z-10 drop-shadow" /> : 
+            <ChevronUp className="h-5 w-5 relative z-10 drop-shadow" />
+          }
+        </button>
+      </div>
+
+      {/* --- Detail Modal with Tabs --- */}
+      <GlassDialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+        <GlassDialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+          <GlassDialogHeader>
+            <GlassDialogTitle className="text-gray-900 dark:text-foreground">{RESOURCES[activeTab].label} Details</GlassDialogTitle>
+            <GlassDialogDescription className="text-gray-600 dark:text-muted-foreground">
+              View and manage record information
+            </GlassDialogDescription>
+          </GlassDialogHeader>
+
+          {/* Tabs */}
+          <div className="flex gap-2 border-b border-border/50 px-1">
+            <button className="px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary">
+              Information
+            </button>
+            <button className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground">
+              History
+            </button>
+            <button className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground">
+              Notes
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-1 glass-scrollbar">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+              {selectedRow && Object.entries(selectedRow).map(([key, value]) => (
+                <div key={key} className="bg-gray-50 dark:bg-accent/20 p-4 rounded-lg border border-gray-200 dark:border-border hover:shadow-md transition-shadow">
+                  <label className="text-xs font-bold text-gray-600 dark:text-muted-foreground uppercase block mb-2 flex items-center gap-2">
+                    <div className="h-1.5 w-1.5 rounded-full bg-primary"></div>
+                    {key.replace(/_/g, ' ')}
+                  </label>
+                  <p className="text-sm font-medium text-gray-900 dark:text-foreground break-words">{String(value)}</p>
                 </div>
               ))}
             </div>
           </div>
-        )}
+          <GlassDialogFooter className="mt-4 gap-2">
+            <GlassButton variant="destructive" onClick={() => { setIsDetailOpen(false); setShowDeleteConfirm(true); }}>
+              <Trash2 className="h-4 w-4 mr-2" /> Delete
+            </GlassButton>
+            <GlassButton onClick={() => openEdit(selectedRow)}>
+              <Edit className="h-4 w-4 mr-2" /> Edit
+            </GlassButton>
+          </GlassDialogFooter>
+        </GlassDialogContent>
+      </GlassDialog>
 
-        {/* Data Display */}
-        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-lg border border-slate-200/50 overflow-hidden min-h-[400px]">
-          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200/50 bg-gradient-to-r from-slate-50/50 to-white/50">
-            <h2 className="text-lg font-semibold text-slate-900">{RESOURCES[activeTab].label}</h2>
-            <div className="text-sm text-slate-500">
-              {filteredAndSortedData.length} {filteredAndSortedData.length === 1 ? 'record' : 'records'}
-            </div>
-          </div>
+      {/* --- Add/Edit Modal (with scrollable form) --- */}
+      <GlassDialog open={isAddOpen || isEditOpen} onOpenChange={(open) => {
+        if (!open) { setIsAddOpen(false); setIsEditOpen(false); }
+      }}>
+        <GlassDialogContent className="max-w-xl max-h-[90vh] flex flex-col">
+          <GlassDialogHeader>
+            <GlassDialogTitle>{isAddOpen ? 'Create New' : 'Edit'} {RESOURCES[activeTab].label}</GlassDialogTitle>
+          </GlassDialogHeader>
 
-          <div className="overflow-x-auto">
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <div className="relative">
-                  <div className="h-16 w-16 rounded-full border-4 border-blue-200 border-t-[#0066CC] animate-spin"></div>
-                  <div className="absolute inset-0 h-16 w-16 rounded-full border-4 border-transparent border-t-[#4A5FCC] animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1s' }}></div>
-                </div>
-              </div>
-            ) : filteredAndSortedData.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-64 text-slate-400">
-                <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-4">
-                  <Search className="h-8 w-8 text-slate-300" />
-                </div>
-                <p className="text-lg font-medium">No records found</p>
-                <p className="text-sm">Try adjusting your filters</p>
-              </div>
-            ) : viewMode === 'table' ? (
-              <table className="w-full text-left text-sm">
-                <thead className="bg-gradient-to-r from-slate-50 to-slate-100/50 text-slate-600">
-                  <tr>
-                    {RESOURCES[activeTab].columns.map((col) => (
-                      <th
-                        key={col}
-                        onClick={() => handleSort(col)}
-                        className="px-6 py-4 font-semibold capitalize tracking-wide cursor-pointer hover:bg-slate-100 transition-colors group"
+          {/* SCROLLABLE AREA with proper height constraints */}
+          <div className="flex-1 overflow-y-auto pr-2 py-4 glass-scrollbar max-h-[calc(90vh-180px)]">
+            <div className="space-y-4">
+              {Object.entries(isAddOpen ? addFormData : editFormData).map(([key, value]) => {
+                const fieldType = FIELD_TYPES[key] || { type: 'text' };
+                return (
+                  <div key={key} className="space-y-2">
+                    <label className="text-sm font-medium capitalize text-foreground">{key.replace(/_/g, ' ')}</label>
+                    {fieldType.type === 'textarea' ? (
+                      <textarea
+                        className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input bg-background text-sm text-foreground focus:ring-2 ring-primary/50 outline-none resize-y"
+                        value={String(value)}
+                        onChange={(e) => {
+                          const newData = isAddOpen ? { ...addFormData } : { ...editFormData };
+                          newData[key] = e.target.value;
+                          isAddOpen ? setAddFormData(newData) : setEditFormData(newData);
+                        }}
+                        placeholder={fieldType.placeholder}
+                      />
+                    ) : key === 'patient' && activeTab === 'Patient Appointment' ? (
+                      <select
+                        className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:ring-2 ring-primary/50 outline-none"
+                        value={String(value)}
+                        onChange={(e) => isAddOpen ? setAddFormData({ ...addFormData, [key]: e.target.value }) : setEditFormData({ ...editFormData, [key]: e.target.value })}
                       >
-                        <div className="flex items-center gap-2">
-                          {col.replace(/_/g, ' ')}
-                          <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                            {sortConfig?.key === col ? (
-                              sortConfig.direction === 'asc' ? (
-                                <ArrowUp className="h-4 w-4 text-[#0066CC]" />
-                              ) : (
-                                <ArrowDown className="h-4 w-4 text-[#0066CC]" />
-                              )
-                            ) : (
-                              <ArrowUpDown className="h-4 w-4 text-slate-400" />
-                            )}
-                          </div>
-                        </div>
-                      </th>
-                    ))}
-                    <th className="px-6 py-4 sr-only">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredAndSortedData.map((row, i) => (
-                    <tr
-                      key={i}
-                      onClick={() => openDetailModal(row)}
-                      className="hover:bg-gradient-to-r hover:from-blue-50/50 hover:to-indigo-50/30 transition-all duration-300 group cursor-pointer transform hover:scale-[1.01]"
-                    >
-                      {RESOURCES[activeTab].columns.map((col) => (
-                        <td key={`${i}-${col}`} className="px-6 py-4 text-slate-700">
-                          {col === 'status' || col === 'docstatus' ? (
-                            <span className={cn(
-                              "px-3 py-1 rounded-full text-xs font-semibold border transition-all duration-300 transform group-hover:scale-105 inline-block",
-                              row[col] === 'Open' || row[col] === 'Active' || row[col] === 1 ? "bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200 shadow-sm" :
-                              row[col] === 'Closed' || row[col] === 0 ? "bg-gradient-to-r from-slate-50 to-slate-100 text-slate-600 border-slate-200" :
-                              "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-blue-200 shadow-sm"
-                            )}>
-                              {row[col] === 1 ? 'Submitted' : row[col] === 0 ? 'Draft' : row[col]}
-                            </span>
-                          ) : (
-                            <span className="group-hover:text-slate-900 transition-colors">{row[col]}</span>
-                          )}
-                        </td>
-                      ))}
-                      <td className="px-6 py-4 text-right">
-                        <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-[#0066CC] group-hover:translate-x-1 inline-block transition-all duration-300" />
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6">
-                {filteredAndSortedData.map((row, i) => (
-                  <div
-                    key={i}
-                    onClick={() => openDetailModal(row)}
-                    className="bg-gradient-to-br from-white to-slate-50/50 border border-slate-200/50 rounded-2xl p-5 hover:shadow-lg hover:scale-[1.02] transition-all duration-300 cursor-pointer group"
-                  >
-                    <div className="space-y-3">
-                      {RESOURCES[activeTab].columns.map((col) => (
-                        <div key={col} className="flex justify-between items-start gap-3">
-                          <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">
-                            {col.replace(/_/g, ' ')}
-                          </span>
-                          {col === 'status' || col === 'docstatus' ? (
-                            <span className={cn(
-                              "px-3 py-1 rounded-full text-xs font-semibold border",
-                              row[col] === 'Open' || row[col] === 'Active' || row[col] === 1 ? "bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200" :
-                              row[col] === 'Closed' || row[col] === 0 ? "bg-gradient-to-r from-slate-50 to-slate-100 text-slate-600 border-slate-200" :
-                              "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-blue-200"
-                            )}>
-                              {row[col] === 1 ? 'Submitted' : row[col] === 0 ? 'Draft' : row[col]}
-                            </span>
-                          ) : (
-                            <span className="text-sm font-medium text-slate-900 text-right">{row[col]}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 flex justify-end">
-                      <ChevronRight className="h-4 w-4 text-slate-300 group-hover:text-[#0066CC] group-hover:translate-x-1 transition-all duration-300" />
-                    </div>
+                        <option value="">Select Patient</option>
+                        {patientList.map(p => <option key={p.name} value={p.name}>{p.patient_name}</option>)}
+                      </select>
+                    ) : fieldType.type === 'select' ? (
+                      <select
+                        className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:ring-2 ring-primary/50 outline-none"
+                        value={String(value)}
+                        onChange={(e) => {
+                          const newData = isAddOpen ? { ...addFormData } : { ...editFormData };
+                          newData[key] = e.target.value;
+                          isAddOpen ? setAddFormData(newData) : setEditFormData(newData);
+                        }}
+                      >
+                        <option value="">Select {key.replace(/_/g, ' ')}</option>
+                        {fieldType.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                      </select>
+                    ) : (
+                      <GlassInput
+                        type={fieldType.type}
+                        value={String(value)}
+                        onChange={(e) => {
+                          const newData = isAddOpen ? { ...addFormData } : { ...editFormData };
+                          newData[key] = e.target.value;
+                          isAddOpen ? setAddFormData(newData) : setEditFormData(newData);
+                        }}
+                        placeholder={fieldType.placeholder}
+                      />
+                    )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-          
-          {/* Pagination */}
-          <div className="px-6 py-4 border-t border-slate-200/50 bg-gradient-to-r from-slate-50/30 to-white/30 flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <span className="text-xs text-slate-500 font-medium">
-                Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalRecords)} of {totalRecords} records
-              </span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="text-xs border border-slate-200 rounded-lg px-2 py-1 bg-white"
-              >
-                <option value="20">20 per page</option>
-                <option value="50">50 per page</option>
-                <option value="100">100 per page</option>
-                <option value="200">200 per page</option>
-                <option value="500">500 per page</option>
-              </select>
-            </div>
-            
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                <ChevronLeft className="h-4 w-4 text-slate-600" />
-              </button>
-              
-              <span className="text-sm font-medium text-slate-700 px-3">
-                Page {currentPage} of {totalPages}
-              </span>
-              
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="p-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-              >
-                <ChevronRight className="h-4 w-4 text-slate-600" />
-              </button>
+                )
+              })}
             </div>
           </div>
-        </div>
-      </main>
 
-      {/* Quick Actions Floating Button */}
-      <div className="fixed bottom-8 right-8 z-50">
-        <div className="relative">
-          {showQuickActions && (
-            <div className="absolute bottom-20 right-0 bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-200/50 p-3 min-w-[240px] animate-in slide-in-from-bottom-5 fade-in duration-300">
-              <div className="space-y-2">
-                {RESOURCES[activeTab].quickActions.map((action, idx) => {
-                  const Icon = action.icon;
-                  return (
-                    <button
-                      key={idx}
-                      onClick={() => {
-                        if (action.label.toLowerCase().includes('new') || action.label.toLowerCase().includes('add') || action.label.toLowerCase().includes('create')) {
-                          openAddModal();
-                        } else {
-                          console.log(`Action: ${action.label}`);
-                          setShowQuickActions(false);
-                        }
-                      }}
-                      className={cn(
-                        "w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 text-left",
-                        action.color === 'blue' && "bg-blue-50 hover:bg-blue-100 text-blue-700",
-                        action.color === 'green' && "bg-green-50 hover:bg-green-100 text-green-700",
-                        action.color === 'purple' && "bg-purple-50 hover:bg-purple-100 text-purple-700"
-                      )}
-                    >
-                      <Icon className="h-5 w-5" />
-                      <span className="font-medium text-sm">{action.label}</span>
-                    </button>
-                  );
-                })}
+          <GlassDialogFooter className="mt-4 pt-4 border-t border-border/50">
+            <GlassButton variant="outline" onClick={() => { setIsAddOpen(false); setIsEditOpen(false); }}>Cancel</GlassButton>
+            <GlassButton onClick={handleSave}>
+              Save Changes
+            </GlassButton>
+          </GlassDialogFooter>
+        </GlassDialogContent>
+      </GlassDialog>
+
+      {/* --- Toast Notification --- */}
+      {toastMessage && (
+        <div className="fixed top-20 right-6 z-[100] animate-in slide-in-from-top-4 fade-in duration-300">
+          <GlassCard className={cn(
+            "border-l-4 shadow-2xl backdrop-blur-xl min-w-[300px]",
+            toastMessage.type === 'success' && "border-l-emerald-500 bg-emerald-50/90 dark:bg-emerald-950/90",
+            toastMessage.type === 'error' && "border-l-red-500 bg-red-50/90 dark:bg-red-950/90",
+            toastMessage.type === 'info' && "border-l-blue-500 bg-blue-50/90 dark:bg-blue-950/90"
+          )}>
+            <GlassCardContent className="p-4">
+              <div className="flex items-start gap-3">
+                <div className={cn(
+                  "h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0",
+                  toastMessage.type === 'success' && "bg-emerald-500",
+                  toastMessage.type === 'error' && "bg-red-500",
+                  toastMessage.type === 'info' && "bg-blue-500"
+                )}>
+                  {toastMessage.type === 'success' && (
+                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                  )}
+                  {toastMessage.type === 'error' && (
+                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  )}
+                  {toastMessage.type === 'info' && (
+                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className={cn(
+                    "text-sm font-medium",
+                    toastMessage.type === 'success' && "text-emerald-900 dark:text-emerald-100",
+                    toastMessage.type === 'error' && "text-red-900 dark:text-red-100",
+                    toastMessage.type === 'info' && "text-blue-900 dark:text-blue-100"
+                  )}>
+                    {toastMessage.message}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setToastMessage(null)}
+                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                >
+                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
+            </GlassCardContent>
+          </GlassCard>
+        </div>
+      )}
+
+      {/* --- Quick Actions Floating Button --- */}
+      <div className="fixed right-6 bottom-24 z-40">
+        <div className="relative">
+          {/* Quick actions menu */}
+          {showQuickActions && (
+            <div className="absolute bottom-16 right-0 flex flex-col gap-2 animate-in slide-in-from-bottom-4 fade-in duration-200">
+              <button
+                onClick={() => { setActiveTab('Patient'); setShowQuickActions(false); openAdd(); }}
+                className="flex items-center gap-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-gray-200 dark:border-border/50 rounded-full px-4 py-2 shadow-xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
+              >
+                <Users className="h-4 w-4" />
+                <span className="text-sm font-medium whitespace-nowrap">New Patient</span>
+              </button>
+              <button
+                onClick={() => { setActiveTab('Patient Appointment'); setShowQuickActions(false); openAdd(); }}
+                className="flex items-center gap-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-gray-200 dark:border-border/50 rounded-full px-4 py-2 shadow-xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
+              >
+                <Calendar className="h-4 w-4" />
+                <span className="text-sm font-medium whitespace-nowrap">New Appointment</span>
+              </button>
+              <button
+                onClick={() => { fetchData(); fetchStats(); setShowQuickActions(false); showToast('success', 'Data refreshed!'); }}
+                className="flex items-center gap-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-gray-200 dark:border-border/50 rounded-full px-4 py-2 shadow-xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
+              >
+                <RefreshCw className="h-4 w-4" />
+                <span className="text-sm font-medium whitespace-nowrap">Refresh All</span>
+              </button>
             </div>
           )}
 
+          {/* Main FAB */}
           <button
             onClick={() => setShowQuickActions(!showQuickActions)}
             className={cn(
-              "h-16 w-16 rounded-full shadow-2xl flex items-center justify-center transition-all duration-300 transform hover:scale-110 active:scale-95",
-              showQuickActions 
-                ? "bg-gradient-to-br from-red-500 to-pink-600 rotate-45" 
-                : "bg-gradient-to-br from-[#0066CC] to-[#4A5FCC]"
+              "h-14 w-14 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-2xl hover:scale-110 transition-all text-white",
+              showQuickActions && "rotate-45"
             )}
           >
-            <Plus className="h-8 w-8 text-white" />
+            <Plus className="h-6 w-6" />
           </button>
         </div>
       </div>
 
-      {/* Detail Modal */}
-      {showDetailModal && selectedRow && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-          onClick={() => setShowDetailModal(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white w-full md:max-w-2xl md:rounded-2xl rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom-10 md:slide-in-from-bottom-0 fade-in duration-300 max-h-[90vh] overflow-hidden flex flex-col"
-          >
-            <div className="bg-gradient-to-r from-[#0066CC] to-[#4A5FCC] text-white px-6 py-8 relative">
-              <button
-                onClick={() => setShowDetailModal(false)}
-                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-all duration-300 transform hover:scale-110"
-              >
-                <X className="h-6 w-6" />
-              </button>
-              <h2 className="text-2xl font-bold mb-2">{RESOURCES[activeTab].label} Details</h2>
-              <p className="text-blue-100 text-sm">View and manage record information</p>
-            </div>
+      {/* --- Delete Confirmation Dialog --- */}
+      <GlassDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <GlassDialogContent className="max-w-md">
+          <GlassDialogHeader>
+            <GlassDialogTitle className="text-gray-900 dark:text-foreground">Confirm Deletion</GlassDialogTitle>
+            <GlassDialogDescription className="text-gray-600 dark:text-muted-foreground">
+              Are you sure you want to delete this record? This action cannot be undone.
+            </GlassDialogDescription>
+          </GlassDialogHeader>
+          <GlassDialogFooter className="gap-2">
+            <GlassButton variant="outline" onClick={() => setShowDeleteConfirm(false)}>
+              Cancel
+            </GlassButton>
+            <GlassButton variant="destructive" onClick={handleDelete}>
+              Delete
+            </GlassButton>
+          </GlassDialogFooter>
+        </GlassDialogContent>
+      </GlassDialog>
 
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="space-y-4">
-                {Object.entries(selectedRow).map(([key, value]) => (
-                  <div key={key} className="bg-gradient-to-r from-slate-50 to-white rounded-xl p-4 border border-slate-200">
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                      {key.replace(/_/g, ' ')}
-                    </label>
-                    {key === 'status' || key === 'docstatus' ? (
-                      <span className={cn(
-                        "inline-flex px-3 py-1.5 rounded-full text-sm font-semibold border",
-                        value === 'Open' || value === 'Active' || value === 1 ? "bg-gradient-to-r from-green-50 to-emerald-50 text-green-700 border-green-200" :
-                        value === 'Closed' || value === 0 ? "bg-gradient-to-r from-slate-50 to-slate-100 text-slate-600 border-slate-200" :
-                        "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 border-blue-200"
-                      )}>
-                        {value === 1 ? 'Submitted' : value === 0 ? 'Draft' : String(value)}
-                      </span>
-                    ) : (
-                      <p className="text-slate-900 font-medium text-lg">{String(value)}</p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t border-slate-200 bg-slate-50/50 px-6 py-4 flex gap-3">
-              <button
-                onClick={() => openEditModal(selectedRow)}
-                className="flex-1 bg-gradient-to-r from-[#0066CC] to-[#4A5FCC] text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2"
-              >
-                <Edit className="h-4 w-4" />
-                Edit
-              </button>
-              <button className="flex-1 bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-medium hover:bg-slate-50 transition-all duration-300 transform hover:scale-105 flex items-center justify-center gap-2">
-                <Mail className="h-4 w-4" />
-                Contact
-              </button>
-              <button
-                onClick={() => handleDeleteRecord(selectedRow.name)}
-                className="px-6 py-3 bg-red-50 hover:bg-red-100 border border-red-200 text-red-600 rounded-xl font-medium transition-all duration-300 transform hover:scale-105"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit Modal */}
-      {showEditModal && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-          onClick={() => setShowEditModal(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white w-full md:max-w-2xl md:rounded-2xl rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 max-h-[90vh] overflow-hidden flex flex-col"
-          >
-            <div className="bg-gradient-to-r from-[#0066CC] to-[#4A5FCC] text-white px-6 py-8 relative">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-all duration-300 transform hover:scale-110"
-              >
-                <X className="h-6 w-6" />
-              </button>
-              <h2 className="text-2xl font-bold mb-2">Edit {RESOURCES[activeTab].label}</h2>
-              <p className="text-blue-100 text-sm">Update record information</p>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="space-y-4">
-                {Object.entries(editFormData).map(([key, value]) => (
-                  <div key={key}>
-                    <label className="block text-sm font-semibold text-slate-700 mb-2 capitalize">
-                      {key.replace(/_/g, ' ')}
-                    </label>
-                    <input
-                      type="text"
-                      value={String(value)}
-                      onChange={(e) => setEditFormData({ ...editFormData, [key]: e.target.value })}
-                      className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0066CC]/30 focus:border-[#0066CC] outline-none transition-all"
-                      disabled={key === 'name'}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="border-t border-slate-200 bg-slate-50/50 px-6 py-4 flex gap-3">
-              <button
-                onClick={() => setShowEditModal(false)}
-                className="flex-1 bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-medium hover:bg-slate-50 transition-all duration-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleEditSubmit}
-                className="flex-1 bg-gradient-to-r from-[#0066CC] to-[#4A5FCC] text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-300 transform hover:scale-105"
-              >
-                Save Changes
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Modal */}
-      {showAddModal && (
-        <div
-          className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-          onClick={() => setShowAddModal(false)}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="bg-white w-full md:max-w-2xl md:rounded-2xl rounded-t-3xl shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300 max-h-[90vh] overflow-hidden flex flex-col"
-          >
-            <div className="bg-gradient-to-r from-[#0066CC] to-[#4A5FCC] text-white px-6 py-8 relative">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="absolute top-4 right-4 p-2 hover:bg-white/20 rounded-full transition-all duration-300 transform hover:scale-110"
-              >
-                <X className="h-6 w-6" />
-              </button>
-              <h2 className="text-2xl font-bold mb-2">Add New {RESOURCES[activeTab].label}</h2>
-              <p className="text-blue-100 text-sm">Create a new record</p>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-6">
-              <div className="space-y-4">
-                {Object.entries(addFormData).map(([key, value]) => {
-                  const fieldType = FIELD_TYPES[key] || { type: 'text' };
-                  const config = RESOURCES[activeTab] as any;
-                  const isRequired = config.requiredFields?.includes(key) || 
-                                   (activeTab === 'Patient' && ['first_name', 'last_name', 'sex'].includes(key));
-                  
-                  return (
-                    <div key={key}>
-                      <label className="block text-sm font-semibold text-slate-700 mb-2 capitalize">
-                        {key.replace(/_/g, ' ')}
-                        {isRequired && <span className="text-red-500 ml-1">*</span>}
-                      </label>
-                      
-                      {/* Patient Dropdown */}
-                      {key === 'patient' ? (
-                        <select
-                          value={String(value)}
-                          onChange={(e) => setAddFormData({ ...addFormData, [key]: e.target.value })}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0066CC]/30 focus:border-[#0066CC] outline-none transition-all bg-white"
-                        >
-                          <option value="">Select Patient</option>
-                          {patientList.map(patient => (
-                            <option key={patient.name} value={patient.name}>
-                              {patient.patient_name || patient.name}
-                            </option>
-                          ))}
-                        </select>
-                      )
-                      
-                      /* Textarea */
-                      : fieldType.type === 'textarea' ? (
-                        <textarea
-                          value={String(value)}
-                          onChange={(e) => setAddFormData({ ...addFormData, [key]: e.target.value })}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0066CC]/30 focus:border-[#0066CC] outline-none transition-all resize-none"
-                          placeholder={fieldType.placeholder || `Enter ${key.replace(/_/g, ' ')}`}
-                          rows={3}
-                        />
-                      )
-                      
-                      /* Select Dropdown */
-                      : fieldType.type === 'select' && fieldType.options ? (
-                        <select
-                          value={String(value)}
-                          onChange={(e) => setAddFormData({ ...addFormData, [key]: e.target.value })}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0066CC]/30 focus:border-[#0066CC] outline-none transition-all bg-white"
-                        >
-                          <option value="">Select {key.replace(/_/g, ' ')}</option>
-                          {fieldType.options.map(opt => (
-                            <option key={opt} value={opt}>
-                              {opt === '0' ? 'No' : opt === '1' ? 'Yes' : opt}
-                            </option>
-                          ))}
-                        </select>
-                      )
-                      
-                      /* Regular Input */
-                      : (
-                        <input
-                          type={fieldType.type}
-                          value={String(value)}
-                          onChange={(e) => setAddFormData({ ...addFormData, [key]: e.target.value })}
-                          className="w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0066CC]/30 focus:border-[#0066CC] outline-none transition-all"
-                          placeholder={fieldType.placeholder || `Enter ${key.replace(/_/g, ' ')}`}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="border-t border-slate-200 bg-slate-50/50 px-6 py-4 flex gap-3">
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="flex-1 bg-white border border-slate-200 text-slate-700 px-6 py-3 rounded-xl font-medium hover:bg-slate-50 transition-all duration-300"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddSubmit}
-                className="flex-1 bg-gradient-to-r from-[#0066CC] to-[#4A5FCC] text-white px-6 py-3 rounded-xl font-medium hover:shadow-lg transition-all duration-300 transform hover:scale-105"
-              >
-                Create Record
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
