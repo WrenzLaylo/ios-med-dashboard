@@ -12,7 +12,8 @@ import { twMerge } from 'tailwind-merge';
 
 // --- Ein UI Imports ---
 import { GlassCard, GlassCardHeader, GlassCardContent, GlassCardTitle, GlassCardDescription } from "@/components/ui/glass-card";
-import { GlassMorphCard } from "@/components/glass-morph-card"; // <--- NEW IMPORT
+import { GlassMorphCard } from "@/components/glass-morph-card";
+import { GlassRippleButton, GlassRipple } from "@/components/glass-ripple";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassBadge } from "@/components/ui/glass-badge";
@@ -51,11 +52,9 @@ function useScrollDirection() {
 const RESOURCES = {
   Patient: {
     label: 'Patients',
-    // Removed "name" from columns to hide the first column ID
     columns: ['patient_name', 'mobile', 'email'],
     fields: JSON.stringify(["name", "patient_name", "first_name", "last_name", "sex", "mobile", "email", "user_id", "age_html"]),
     filterableFields: ['sex', 'email'],
-    // Added updateFields to ensure we edit First/Last name specifically
     updateFields: ['first_name', 'last_name', 'sex', 'mobile', 'email'],
     createFields: ['first_name', 'last_name', 'sex', 'mobile', 'email', 'user_id', 'age'],
     fieldMapping: { age: 'age_html' },
@@ -166,15 +165,12 @@ export default function IOSDashboard() {
         setViewMode('card');
       }
     };
-    
-    // Check initially
     handleResize();
-
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // --- Debounced search for performance ---
+  // --- Debounced search ---
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
@@ -190,7 +186,7 @@ export default function IOSDashboard() {
     }
   }, [toastMessage]);
 
-  // --- Effects ---
+  // --- Data Fetching ---
   useEffect(() => {
     async function fetchPatients() {
       try {
@@ -326,18 +322,13 @@ export default function IOSDashboard() {
   };
 
   const openEdit = (row: any) => {
-    // Determine which fields to show in the Edit form
     const config = RESOURCES[activeTab];
-    // Check for specific updateFields (for Patient first/last name logic) or fall back to createFields/columns
     const fieldsToEdit = (config as any).updateFields || (config as any).createFields || config.columns;
-    
-    // Filter the row data to only include relevant fields, plus the ID (name)
     const initialData: any = { name: row.name };
     fieldsToEdit.forEach((field: string) => {
         if (row[field] !== undefined) {
             initialData[field] = row[field];
         } else {
-             // Handle case where field might be missing in row but needed in form
             const fieldDef = FIELD_TYPES[field];
             initialData[field] = fieldDef?.default !== undefined ? fieldDef.default : '';
         }
@@ -365,29 +356,16 @@ export default function IOSDashboard() {
       showToast('error', 'No record selected or record ID is missing');
       return;
     }
-    
     setShowDeleteConfirm(false);
-    
     try {
       showToast('info', 'Deleting record...');
-      
       const response = await fetch('/api/delete', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          resource: activeTab,
-          name: selectedRow.name
-        })
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ resource: activeTab, name: selectedRow.name })
       });
-
       const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to delete record');
-      }
-
+      if (!response.ok) throw new Error(result.message || 'Failed to delete record');
       showToast('success', 'Record deleted successfully!');
       setIsDetailOpen(false);
       setSelectedRow(null);
@@ -399,7 +377,6 @@ export default function IOSDashboard() {
     }
   };
 
-  // --- UPDATED SAVE FUNCTION ---
   const handleSave = async () => {
     const isCreating = isAddOpen;
     const currentData = isCreating ? addFormData : editFormData;
@@ -409,7 +386,6 @@ export default function IOSDashboard() {
       return;
     }
 
-    // Filter out read-only/system fields for Update
     let payloadData = { ...currentData };
     if (!isCreating) {
       const systemFields = ['creation', 'modified', 'owner', 'docstatus', 'idx', '_user_tags', '_comments', '_assign', '_liked_by'];
@@ -418,7 +394,6 @@ export default function IOSDashboard() {
 
     try {
       showToast('info', isCreating ? 'Creating record...' : 'Updating record...');
-
       const response = await fetch('/api/save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -429,23 +404,15 @@ export default function IOSDashboard() {
           name: isCreating ? undefined : currentData.name
         })
       });
-
       const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Failed to save changes');
-      }
-
+      if (!response.ok) throw new Error(result.message || 'Failed to save changes');
       setIsAddOpen(false);
       setIsEditOpen(false);
       setAddFormData({});
       setEditFormData({});
-
       showToast('success', isCreating ? 'Record created successfully!' : 'Record updated successfully!');
-
       fetchData();
       fetchStats();
-
     } catch (error) {
       console.error('Save error:', error);
       showToast('error', error instanceof Error ? error.message : 'Failed to save changes');
@@ -458,41 +425,28 @@ export default function IOSDashboard() {
 
   const toggleRowSelection = (index: number) => {
     const newSelection = new Set(selectedRows);
-    if (newSelection.has(index)) {
-      newSelection.delete(index);
-    } else {
-      newSelection.add(index);
-    }
+    if (newSelection.has(index)) newSelection.delete(index);
+    else newSelection.add(index);
     setSelectedRows(newSelection);
   };
 
   const handleBatchDelete = async () => {
     if (selectedRows.size === 0) return;
-
     try {
       showToast('info', `Deleting ${selectedRows.size} records...`);
-
       const deletePromises = Array.from(selectedRows).map(async (index) => {
         const row = filteredAndSortedData[index];
         const response = await fetch('/api/delete', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            resource: activeTab,
-            name: row.name
-          })
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ resource: activeTab, name: row.name })
         });
-
         if (!response.ok) {
           const result = await response.json();
           throw new Error(result.message || 'Failed to delete record');
         }
       });
-
       await Promise.all(deletePromises);
-
       showToast('success', `${selectedRows.size} records deleted successfully!`);
       setSelectedRows(new Set());
       fetchData();
@@ -523,7 +477,6 @@ export default function IOSDashboard() {
 
   return (
     <div className="min-h-screen w-full bg-background transition-colors duration-300 pb-32">
-       {/* Inject Floating Animation Styles */}
        <style jsx global>{`
         @keyframes float {
           0% { transform: translateY(0px); }
@@ -571,32 +524,15 @@ export default function IOSDashboard() {
           </div>
 
           <div className="flex items-center gap-3">
-            <button
+            {/* Theme Toggle Button - Now with Ripple */}
+            <GlassRippleButton
               onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-              className={cn(
-                "p-3 rounded-2xl transition-all duration-500",
-                "bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl",
-                "border-2 border-white/40 dark:border-white/10",
-                "hover:bg-white/90 dark:hover:bg-slate-800/90",
-                "hover:scale-110 hover:shadow-2xl hover:border-white/60 dark:hover:border-white/20",
-                "text-gray-800 dark:text-foreground",
-                "group relative overflow-hidden",
-                "shadow-lg"
-              )}
-              suppressHydrationWarning
+              className="p-3 rounded-2xl bg-white/70 dark:bg-slate-800/70 border-2 border-white/40 dark:border-white/10 text-gray-800 dark:text-foreground"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-              <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
               {mounted ? (
-                theme === 'dark' ? (
-                  <Sun className="h-5 w-5 relative z-10 drop-shadow" />
-                ) : (
-                  <Moon className="h-5 w-5 relative z-10 drop-shadow" />
-                )
-              ) : (
-                <div className="h-5 w-5" />
-              )}
-            </button>
+                theme === 'dark' ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />
+              ) : <div className="h-5 w-5" />}
+            </GlassRippleButton>
           </div>
         </div>
 
@@ -628,24 +564,20 @@ export default function IOSDashboard() {
             { icon: RefreshCw, active: false, onClick: () => fetchData(), spinning: loading },
             { icon: LayoutList, active: false, onClick: () => setViewMode(v => v === 'table' ? 'card' : 'table') }
           ].map((btn, idx) => (
-            <button
+            // Replaced manual button with GlassRippleButton
+            <GlassRippleButton
               key={idx}
               onClick={btn.onClick}
               className={cn(
-                "h-11 w-11 rounded-2xl transition-all duration-500 flex items-center justify-center",
+                "h-11 w-11 rounded-2xl flex items-center justify-center p-0",
                 "bg-white/70 dark:bg-slate-800/70 backdrop-blur-xl",
                 "border-2 border-white/40 dark:border-white/10",
-                "hover:bg-white/90 dark:hover:bg-slate-800/90",
                 "text-gray-800 dark:text-foreground",
-                "shadow-lg hover:shadow-2xl hover:scale-110 hover:border-white/60 dark:hover:border-white/20",
-                "relative overflow-hidden group",
-                btn.active && "bg-primary/30 dark:bg-primary/30 border-primary/50 text-primary shadow-2xl scale-105"
+                btn.active && "bg-primary/30 dark:bg-primary/30 border-primary/50 text-primary"
               )}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-              <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-              <btn.icon className={cn("h-4 w-4 relative z-10 drop-shadow", btn.spinning && "animate-spin")} />
-            </button>
+              <btn.icon className={cn("h-4 w-4", btn.spinning && "animate-spin")} />
+            </GlassRippleButton>
           ))}
         </div>
 
@@ -685,11 +617,9 @@ export default function IOSDashboard() {
         )}
       </header>
 
-      {/* --- Stats Dashboard --- */}
+      {/* --- Stats Dashboard (Morph Cards) --- */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          
-          {/* Card 1: Patients */}
           <GlassMorphCard glowColor="cyan" intensity={30}>
             <div className="p-6">
               <div className="flex items-center justify-between">
@@ -705,8 +635,7 @@ export default function IOSDashboard() {
               </div>
             </div>
           </GlassMorphCard>
-
-          {/* Card 2: Appointments */}
+          
           <GlassMorphCard glowColor="purple" intensity={30}>
              <div className="p-6">
               <div className="flex items-center justify-between">
@@ -723,7 +652,6 @@ export default function IOSDashboard() {
             </div>
           </GlassMorphCard>
 
-          {/* Card 3: Practitioners */}
           <GlassMorphCard glowColor="green" intensity={30}>
              <div className="p-6">
               <div className="flex items-center justify-between">
@@ -738,7 +666,6 @@ export default function IOSDashboard() {
             </div>
           </GlassMorphCard>
 
-          {/* Card 4: Schedules */}
           <GlassMorphCard glowColor="blue" intensity={30}>
              <div className="p-6">
               <div className="flex items-center justify-between">
@@ -752,7 +679,6 @@ export default function IOSDashboard() {
               </div>
             </div>
           </GlassMorphCard>
-
         </div>
       </div>
 
@@ -767,10 +693,7 @@ export default function IOSDashboard() {
                   {selectedRows.size > 0 ? (
                     <span className="flex items-center gap-2">
                       {selectedRows.size} selected
-                      <button
-                        onClick={handleBatchDelete}
-                        className="text-xs text-red-600 dark:text-red-400 hover:underline"
-                      >
+                      <button onClick={handleBatchDelete} className="text-xs text-red-600 dark:text-red-400 hover:underline">
                         Delete selected
                       </button>
                     </span>
@@ -780,21 +703,22 @@ export default function IOSDashboard() {
                 </GlassCardDescription>
               </div>
               <div className="flex items-center gap-1 bg-white/60 dark:bg-accent/30 rounded-lg p-1 border border-gray-200 dark:border-border/50">
-                <button
+                {/* Pagination Controls - Updated to GlassRippleButton */}
+                <GlassRippleButton
                   disabled={currentPage === 1}
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  className="p-2 hover:bg-gray-200 dark:hover:bg-accent/60 rounded-md disabled:opacity-30 transition-colors text-gray-800 dark:text-foreground"
+                  className="p-2 h-8 w-8 hover:bg-gray-200 dark:hover:bg-accent/60 rounded-md disabled:opacity-30 text-gray-800 dark:text-foreground flex items-center justify-center"
                 >
                   <ChevronLeft className="h-4 w-4" />
-                </button>
+                </GlassRippleButton>
                 <span className="text-xs font-mono px-2 text-gray-900 dark:text-foreground/80">{currentPage}</span>
-                <button
+                <GlassRippleButton
                   disabled={data.length < pageSize}
                   onClick={() => setCurrentPage(p => p + 1)}
-                  className="p-2 hover:bg-gray-200 dark:hover:bg-accent/60 rounded-md disabled:opacity-30 transition-colors text-gray-800 dark:text-foreground"
+                  className="p-2 h-8 w-8 hover:bg-gray-200 dark:hover:bg-accent/60 rounded-md disabled:opacity-30 text-gray-800 dark:text-foreground flex items-center justify-center"
                 >
                   <ChevronRight className="h-4 w-4" />
-                </button>
+                </GlassRippleButton>
               </div>
             </div>
           </GlassCardHeader>
@@ -807,6 +731,7 @@ export default function IOSDashboard() {
               </div>
             ) : filteredAndSortedData.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-96 text-muted-foreground p-8">
+                {/* Empty State */}
                 <div className="relative mb-6">
                   <div className="absolute inset-0 bg-primary/20 blur-3xl rounded-full"></div>
                   <Search className="h-24 w-24 opacity-20 relative z-10" />
@@ -816,20 +741,15 @@ export default function IOSDashboard() {
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-muted-foreground mb-6 text-center max-w-md">
                   {searchTerm || Object.keys(activeFilters).length > 0
-                    ? 'Try adjusting your search or filters to find what you\'re looking for.'
+                    ? 'Try adjusting your search or filters.'
                     : `Get started by adding your first ${RESOURCES[activeTab].label.toLowerCase().slice(0, -1)}.`
                   }
                 </p>
                 {!searchTerm && Object.keys(activeFilters).length === 0 && (
-                  <GlassButton onClick={openAdd} className="gap-2">
+                  <GlassRippleButton onClick={openAdd} className="gap-2 bg-primary text-white">
                     <Plus className="h-4 w-4" />
                     Add {RESOURCES[activeTab].label.slice(0, -1)}
-                  </GlassButton>
-                )}
-                {(searchTerm || Object.keys(activeFilters).length > 0) && (
-                  <GlassButton variant="outline" onClick={() => { setSearchTerm(''); setActiveFilters({}); }}>
-                    Clear filters
-                  </GlassButton>
+                  </GlassRippleButton>
                 )}
               </div>
             ) : viewMode === 'table' ? (
@@ -842,11 +762,8 @@ export default function IOSDashboard() {
                           type="checkbox"
                           checked={selectedRows.size === filteredAndSortedData.length && filteredAndSortedData.length > 0}
                           onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedRows(new Set(filteredAndSortedData.map((_, i) => i)));
-                            } else {
-                              setSelectedRows(new Set());
-                            }
+                            if (e.target.checked) setSelectedRows(new Set(filteredAndSortedData.map((_, i) => i)));
+                            else setSelectedRows(new Set());
                           }}
                           className="h-4 w-4 rounded border-gray-300 dark:border-border text-primary focus:ring-2 focus:ring-primary/50"
                         />
@@ -881,10 +798,7 @@ export default function IOSDashboard() {
                           <input
                             type="checkbox"
                             checked={selectedRows.has(i)}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              toggleRowSelection(i);
-                            }}
+                            onChange={(e) => { e.stopPropagation(); toggleRowSelection(i); }}
                             onClick={(e) => e.stopPropagation()}
                             className="h-4 w-4 rounded border-gray-300 dark:border-border text-primary focus:ring-2 focus:ring-primary/50"
                           />
@@ -907,27 +821,21 @@ export default function IOSDashboard() {
                             )}
                           </td>
                         ))}
-                        {/* --- NEW: Direct Edit/Delete Buttons in Table Row --- */}
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <button 
                               onClick={(e) => { e.stopPropagation(); openEdit(row); }}
                               className="p-1.5 hover:bg-primary/10 rounded-full text-gray-500 hover:text-primary transition-colors"
-                              title="Edit"
                             >
                               <Edit className="h-4 w-4" />
                             </button>
                             <button 
                               onClick={(e) => { e.stopPropagation(); setSelectedRow(row); setShowDeleteConfirm(true); }}
                               className="p-1.5 hover:bg-red-500/10 rounded-full text-gray-500 hover:text-red-600 transition-colors"
-                              title="Delete"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
-                            <button 
-                              onClick={() => openDetail(row)}
-                              className="p-1.5 hover:bg-gray-100 dark:hover:bg-accent rounded-full text-gray-400 hover:text-gray-900 dark:hover:text-foreground transition-colors"
-                            >
+                            <button onClick={() => openDetail(row)} className="p-1.5 hover:bg-gray-100 dark:hover:bg-accent rounded-full text-gray-400">
                               <ChevronRight className="h-4 w-4" />
                             </button>
                           </div>
@@ -939,28 +847,34 @@ export default function IOSDashboard() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-6">
+                {/* --- Ripple Container Example for Grid Cards --- */}
                 {filteredAndSortedData.map((row, i) => (
-                  <GlassCard
-                    key={i}
-                    className="cursor-pointer hover:bg-accent/50 dark:hover:bg-accent/30 hover:scale-[1.02] transition-all duration-300 border-border/70"
+                  <GlassRipple 
+                    key={i} 
+                    className="rounded-xl overflow-hidden cursor-pointer"
                     onClick={() => openDetail(row)}
+                    color="cyan" // Subtle feedback color
                   >
-                    <GlassCardContent className="p-4 space-y-2">
-                      <div className="flex justify-between items-start">
-                          <div className="font-bold">{row.name}</div>
-                          <div className="flex gap-2">
-                            <button onClick={(e) => { e.stopPropagation(); openEdit(row); }} className="text-primary"><Edit className="h-4 w-4"/></button>
-                            <button onClick={(e) => { e.stopPropagation(); setSelectedRow(row); setShowDeleteConfirm(true); }} className="text-red-500"><Trash2 className="h-4 w-4"/></button>
-                          </div>
-                      </div>
-                      {RESOURCES[activeTab].columns.map(col => (
-                        <div key={col} className="flex justify-between items-start border-b border-border/50 pb-2 last:border-0 last:pb-0">
-                          <span className="text-[11px] font-bold text-gray-600 dark:text-muted-foreground uppercase tracking-wide">{col.replace(/_/g, ' ')}</span>
-                          <span className="text-sm font-medium text-right text-gray-900 dark:text-foreground/90 truncate max-w-[60%]">{row[col]}</span>
+                    <GlassCard
+                      className="h-full hover:bg-accent/50 dark:hover:bg-accent/30 transition-all duration-300 border-border/70 pointer-events-none" // pointer-events-none to let ripple capture click if needed, or just let bubble
+                    >
+                      <GlassCardContent className="p-4 space-y-2 pointer-events-auto">
+                        <div className="flex justify-between items-start">
+                            <div className="font-bold">{row.name}</div>
+                            <div className="flex gap-2">
+                              <button onClick={(e) => { e.stopPropagation(); openEdit(row); }} className="text-primary z-10 relative"><Edit className="h-4 w-4"/></button>
+                              <button onClick={(e) => { e.stopPropagation(); setSelectedRow(row); setShowDeleteConfirm(true); }} className="text-red-500 z-10 relative"><Trash2 className="h-4 w-4"/></button>
+                            </div>
                         </div>
-                      ))}
-                    </GlassCardContent>
-                  </GlassCard>
+                        {RESOURCES[activeTab].columns.map(col => (
+                          <div key={col} className="flex justify-between items-start border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                            <span className="text-[11px] font-bold text-gray-600 dark:text-muted-foreground uppercase tracking-wide">{col.replace(/_/g, ' ')}</span>
+                            <span className="text-sm font-medium text-right text-gray-900 dark:text-foreground/90 truncate max-w-[60%]">{row[col]}</span>
+                          </div>
+                        ))}
+                      </GlassCardContent>
+                    </GlassCard>
+                  </GlassRipple>
                 ))}
               </div>
             )}
@@ -968,7 +882,7 @@ export default function IOSDashboard() {
         </GlassCard>
       </main>
 
-      {/* --- Dock Navigation with Toggle (FIXED POSITIONING) --- */}
+      {/* --- Dock Navigation --- */}
       <div className="fixed bottom-6 inset-x-0 z-50 flex flex-col items-center gap-3 pointer-events-none">
         <div className={cn(
           "pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] origin-bottom",
@@ -994,9 +908,6 @@ export default function IOSDashboard() {
             "group relative overflow-hidden"
           )}
         >
-          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
-          <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          
           {showDock ? 
             <ChevronDown className="h-5 w-5 relative z-10 drop-shadow" /> : 
             <ChevronUp className="h-5 w-5 relative z-10 drop-shadow" />
@@ -1004,29 +915,18 @@ export default function IOSDashboard() {
         </button>
       </div>
 
-      {/* --- Detail Modal with Tabs (FIXED LAYOUT) --- */}
+      {/* --- Detail Modal --- */}
       <GlassDialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
         <GlassDialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
           <GlassDialogHeader>
             <GlassDialogTitle className="text-gray-900 dark:text-foreground">{RESOURCES[activeTab].label} Details</GlassDialogTitle>
-            <GlassDialogDescription className="text-gray-600 dark:text-muted-foreground">
-              View and manage record information
-            </GlassDialogDescription>
+            <GlassDialogDescription className="text-gray-600 dark:text-muted-foreground">View and manage record information</GlassDialogDescription>
           </GlassDialogHeader>
-
-          {/* Tabs */}
           <div className="flex gap-2 border-b border-border/50 px-1 flex-shrink-0">
-            <button className="px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary">
-              Information
-            </button>
-            <button className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground">
-              History
-            </button>
-            <button className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-muted-foreground hover:text-gray-900 dark:hover:text-foreground">
-              Notes
-            </button>
+            <button className="px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary">Information</button>
+            <button className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-muted-foreground">History</button>
+            <button className="px-4 py-2 text-sm font-medium text-gray-600 dark:text-muted-foreground">Notes</button>
           </div>
-
           <div className="flex-1 overflow-y-auto p-4 glass-scrollbar min-h-0">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {selectedRow && Object.entries(selectedRow).map(([key, value]) => (
@@ -1040,202 +940,104 @@ export default function IOSDashboard() {
               ))}
             </div>
           </div>
-
-          {/* Sticky Footer for Buttons */}
           <GlassDialogFooter className="mt-4 gap-2 flex-shrink-0 z-10 bg-white/50 dark:bg-black/20 backdrop-blur-md p-2 rounded-xl">
-            <GlassButton variant="destructive" onClick={() => { setIsDetailOpen(false); setShowDeleteConfirm(true); }}>
+            {/* Swapped to GlassRippleButton */}
+            <GlassRippleButton 
+              className="bg-red-500/80 hover:bg-red-600/90 text-white" 
+              onClick={() => { setIsDetailOpen(false); setShowDeleteConfirm(true); }}
+            >
               <Trash2 className="h-4 w-4 mr-2" /> Delete
-            </GlassButton>
-            <GlassButton onClick={() => openEdit(selectedRow)}>
+            </GlassRippleButton>
+            <GlassRippleButton onClick={() => openEdit(selectedRow)}>
               <Edit className="h-4 w-4 mr-2" /> Edit
-            </GlassButton>
+            </GlassRippleButton>
           </GlassDialogFooter>
         </GlassDialogContent>
       </GlassDialog>
 
-      {/* --- Add/Edit Modal (with scrollable form) --- */}
-      <GlassDialog open={isAddOpen || isEditOpen} onOpenChange={(open) => {
-        if (!open) { setIsAddOpen(false); setIsEditOpen(false); }
-      }}>
+      {/* --- Add/Edit Modal --- */}
+      <GlassDialog open={isAddOpen || isEditOpen} onOpenChange={(open) => { if (!open) { setIsAddOpen(false); setIsEditOpen(false); } }}>
         <GlassDialogContent className="max-w-xl max-h-[90vh] flex flex-col">
           <GlassDialogHeader>
             <GlassDialogTitle>{isAddOpen ? 'Create New' : 'Edit'} {RESOURCES[activeTab].label}</GlassDialogTitle>
           </GlassDialogHeader>
-
           <div className="flex-1 overflow-y-auto pr-2 py-4 glass-scrollbar max-h-[calc(90vh-180px)]">
             <div className="space-y-4">
               {Object.entries(isAddOpen ? addFormData : editFormData).map(([key, value]) => {
                 const fieldType = FIELD_TYPES[key] || { type: 'text' };
-                // Skip rendering ID field in form (but keep it in state)
                 if (key === 'name' && !isAddOpen) return null; 
-
                 return (
                   <div key={key} className="space-y-2">
                     <label className="text-sm font-medium capitalize text-foreground">{key.replace(/_/g, ' ')}</label>
                     {fieldType.type === 'textarea' ? (
-                      <textarea
-                        className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input bg-background text-sm text-foreground focus:ring-2 ring-primary/50 outline-none resize-y"
-                        value={String(value)}
-                        onChange={(e) => {
-                          const newData = isAddOpen ? { ...addFormData } : { ...editFormData };
-                          newData[key] = e.target.value;
-                          isAddOpen ? setAddFormData(newData) : setEditFormData(newData);
-                        }}
-                        placeholder={fieldType.placeholder}
-                      />
+                      <textarea className="w-full min-h-[80px] px-3 py-2 rounded-md border border-input bg-background text-sm text-foreground focus:ring-2 ring-primary/50 outline-none resize-y" value={String(value)} onChange={(e) => { const newData = isAddOpen ? { ...addFormData } : { ...editFormData }; newData[key] = e.target.value; isAddOpen ? setAddFormData(newData) : setEditFormData(newData); }} placeholder={fieldType.placeholder} />
                     ) : key === 'patient' && activeTab === 'Patient Appointment' ? (
-                      <select
-                        className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:ring-2 ring-primary/50 outline-none"
-                        value={String(value)}
-                        onChange={(e) => isAddOpen ? setAddFormData({ ...addFormData, [key]: e.target.value }) : setEditFormData({ ...editFormData, [key]: e.target.value })}
-                      >
-                        <option value="">Select Patient</option>
-                        {patientList.map(p => <option key={p.name} value={p.name}>{p.patient_name}</option>)}
-                      </select>
+                      <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:ring-2 ring-primary/50 outline-none" value={String(value)} onChange={(e) => isAddOpen ? setAddFormData({ ...addFormData, [key]: e.target.value }) : setEditFormData({ ...editFormData, [key]: e.target.value })}> <option value="">Select Patient</option> {patientList.map(p => <option key={p.name} value={p.name}>{p.patient_name}</option>)} </select>
                     ) : fieldType.type === 'select' ? (
-                      <select
-                        className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:ring-2 ring-primary/50 outline-none"
-                        value={String(value)}
-                        onChange={(e) => {
-                          const newData = isAddOpen ? { ...addFormData } : { ...editFormData };
-                          newData[key] = e.target.value;
-                          isAddOpen ? setAddFormData(newData) : setEditFormData(newData);
-                        }}
-                      >
-                        <option value="">Select {key.replace(/_/g, ' ')}</option>
-                        {fieldType.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                      </select>
+                      <select className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground focus:ring-2 ring-primary/50 outline-none" value={String(value)} onChange={(e) => { const newData = isAddOpen ? { ...addFormData } : { ...editFormData }; newData[key] = e.target.value; isAddOpen ? setAddFormData(newData) : setEditFormData(newData); }}> <option value="">Select {key.replace(/_/g, ' ')}</option> {fieldType.options?.map(opt => <option key={opt} value={opt}>{opt}</option>)} </select>
                     ) : (
-                      <GlassInput
-                        type={fieldType.type}
-                        value={String(value)}
-                        onChange={(e) => {
-                          const newData = isAddOpen ? { ...addFormData } : { ...editFormData };
-                          newData[key] = e.target.value;
-                          isAddOpen ? setAddFormData(newData) : setEditFormData(newData);
-                        }}
-                        placeholder={fieldType.placeholder}
-                      />
+                      <GlassInput type={fieldType.type} value={String(value)} onChange={(e) => { const newData = isAddOpen ? { ...addFormData } : { ...editFormData }; newData[key] = e.target.value; isAddOpen ? setAddFormData(newData) : setEditFormData(newData); }} placeholder={fieldType.placeholder} />
                     )}
                   </div>
                 )
               })}
             </div>
           </div>
-
           <GlassDialogFooter className="mt-4 pt-4 border-t border-border/50">
-            <GlassButton variant="outline" onClick={() => { setIsAddOpen(false); setIsEditOpen(false); }}>Cancel</GlassButton>
-            <GlassButton onClick={handleSave}>
-              Save Changes
-            </GlassButton>
+            {/* Swapped to GlassRippleButton */}
+            <GlassRippleButton variant="outline" onClick={() => { setIsAddOpen(false); setIsEditOpen(false); }}>Cancel</GlassRippleButton>
+            <GlassRippleButton onClick={handleSave}>Save Changes</GlassRippleButton>
           </GlassDialogFooter>
         </GlassDialogContent>
       </GlassDialog>
 
-      {/* --- Toast Notification --- */}
-      {toastMessage && (
-        <div className="fixed top-20 right-6 z-[100] animate-in slide-in-from-top-4 fade-in duration-300">
-          <GlassCard className={cn(
-            "border-l-4 shadow-2xl backdrop-blur-xl min-w-[300px]",
-            toastMessage.type === 'success' && "border-l-emerald-500 bg-emerald-50/90 dark:bg-emerald-950/90",
-            toastMessage.type === 'error' && "border-l-red-500 bg-red-50/90 dark:bg-red-950/90",
-            toastMessage.type === 'info' && "border-l-blue-500 bg-blue-50/90 dark:bg-blue-950/90"
-          )}>
-            <GlassCardContent className="p-4">
-              <div className="flex items-start gap-3">
-                <div className={cn(
-                  "h-8 w-8 rounded-lg flex items-center justify-center flex-shrink-0",
-                  toastMessage.type === 'success' && "bg-emerald-500",
-                  toastMessage.type === 'error' && "bg-red-500",
-                  toastMessage.type === 'info' && "bg-blue-500"
-                )}>
-                  {toastMessage.type === 'success' && (
-                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                  {toastMessage.type === 'error' && (
-                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  )}
-                  {toastMessage.type === 'info' && (
-                    <svg className="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  )}
-                </div>
-                <div className="flex-1">
-                  <p className={cn(
-                    "text-sm font-medium",
-                    toastMessage.type === 'success' && "text-emerald-900 dark:text-emerald-100",
-                    toastMessage.type === 'error' && "text-red-900 dark:text-red-100",
-                    toastMessage.type === 'info' && "text-blue-900 dark:text-blue-100"
-                  )}>
-                    {toastMessage.message}
-                  </p>
-                </div>
-                <button
-                  onClick={() => setToastMessage(null)}
-                  className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                >
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-            </GlassCardContent>
-          </GlassCard>
-        </div>
-      )}
-
       {/* --- Quick Actions Floating Button --- */}
       <div className="fixed right-6 bottom-8 z-40">
-        <div className="relative animate-float"> {/* Added animate-float here */}
+        <div className="relative animate-float"> 
           {/* Quick actions menu */}
           {showQuickActions && (
             <div className="absolute bottom-20 right-0 flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-300">
-              <button
+               {/* Updated Quick Action Buttons to use GlassRippleButton */}
+              <GlassRippleButton
                 onClick={() => { setActiveTab('Patient'); setShowQuickActions(false); openAdd(); }}
-                className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-white/20 rounded-2xl px-5 py-3 shadow-2xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
+                className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-white/20 rounded-2xl px-5 py-3 shadow-2xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group w-full justify-start"
               >
                 <Users className="h-5 w-5 text-blue-500" />
                 <span className="text-sm font-bold whitespace-nowrap">New Patient</span>
-              </button>
-              <button
+              </GlassRippleButton>
+              <GlassRippleButton
                 onClick={() => { setActiveTab('Patient Appointment'); setShowQuickActions(false); openAdd(); }}
-                className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-white/20 rounded-2xl px-5 py-3 shadow-2xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
+                className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-white/20 rounded-2xl px-5 py-3 shadow-2xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group w-full justify-start"
               >
                 <Calendar className="h-5 w-5 text-purple-500" />
                 <span className="text-sm font-bold whitespace-nowrap">New Appointment</span>
-              </button>
-              <button
+              </GlassRippleButton>
+              <GlassRippleButton
                 onClick={() => { fetchData(); fetchStats(); setShowQuickActions(false); showToast('success', 'Data refreshed!'); }}
-                className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-white/20 rounded-2xl px-5 py-3 shadow-2xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
+                className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-white/20 rounded-2xl px-5 py-3 shadow-2xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group w-full justify-start"
               >
                 <RefreshCw className="h-5 w-5 text-emerald-500" />
                 <span className="text-sm font-bold whitespace-nowrap">Refresh All</span>
-              </button>
+              </GlassRippleButton>
             </div>
           )}
 
-          {/* Main FAB - Lively Liquid Glass Design */}
-          <button
+          {/* Main FAB - Using GlassRippleButton but keeping liquid style via classes */}
+          <GlassRippleButton
             onClick={() => setShowQuickActions(!showQuickActions)}
             className={cn(
-              "h-16 w-16 rounded-[24px] flex items-center justify-center transition-all duration-500",
+              "h-16 w-16 rounded-[24px] flex items-center justify-center transition-all duration-500 p-0",
               "bg-gradient-to-br from-blue-500/80 via-purple-500/80 to-pink-500/80",
               "backdrop-blur-2xl border border-white/40",
-              "shadow-[0_8px_32px_0_rgba(31,38,135,0.37)]", // Deep glass shadow
+              "shadow-[0_8px_32px_0_rgba(31,38,135,0.37)]",
               "hover:scale-110 hover:shadow-[0_8px_40px_0_rgba(31,38,135,0.5)]",
-              "text-white",
-              "before:absolute before:inset-0 before:bg-gradient-to-t before:from-black/10 before:to-transparent before:rounded-[24px]",
-              "after:absolute after:top-0 after:left-0 after:right-0 after:h-1/2 after:bg-gradient-to-b after:from-white/30 after:to-transparent after:rounded-t-[24px]",
+              "text-white overflow-hidden",
               showQuickActions && "rotate-45 bg-red-500/80 from-red-500/80 to-orange-500/80"
             )}
           >
+             {/* Note: GlassRippleButton inherently adds ripple, providing the requested feedback */}
             <Plus className={cn("h-8 w-8 relative z-10 drop-shadow-md transition-transform duration-300", showQuickActions ? "rotate-90" : "rotate-0")} />
-          </button>
+          </GlassRippleButton>
         </div>
       </div>
 
@@ -1244,17 +1046,11 @@ export default function IOSDashboard() {
         <GlassDialogContent className="max-w-md">
           <GlassDialogHeader>
             <GlassDialogTitle className="text-gray-900 dark:text-foreground">Confirm Deletion</GlassDialogTitle>
-            <GlassDialogDescription className="text-gray-600 dark:text-muted-foreground">
-              Are you sure you want to delete this record? This action cannot be undone.
-            </GlassDialogDescription>
+            <GlassDialogDescription className="text-gray-600 dark:text-muted-foreground">Are you sure you want to delete this record? This action cannot be undone.</GlassDialogDescription>
           </GlassDialogHeader>
           <GlassDialogFooter className="gap-2">
-            <GlassButton variant="outline" onClick={() => setShowDeleteConfirm(false)}>
-              Cancel
-            </GlassButton>
-            <GlassButton variant="destructive" onClick={handleDelete}>
-              Delete
-            </GlassButton>
+            <GlassRippleButton variant="outline" onClick={() => setShowDeleteConfirm(false)}>Cancel</GlassRippleButton>
+            <GlassRippleButton className="bg-red-500/80 hover:bg-red-600/90 text-white" onClick={handleDelete}>Delete</GlassRippleButton>
           </GlassDialogFooter>
         </GlassDialogContent>
       </GlassDialog>
