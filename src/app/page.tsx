@@ -12,6 +12,7 @@ import { twMerge } from 'tailwind-merge';
 
 // --- Ein UI Imports ---
 import { GlassCard, GlassCardHeader, GlassCardContent, GlassCardTitle, GlassCardDescription } from "@/components/ui/glass-card";
+import { GlassMorphCard } from "@/components/glass-morph-card"; // <--- NEW IMPORT
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
 import { GlassBadge } from "@/components/ui/glass-badge";
@@ -687,8 +688,10 @@ export default function IOSDashboard() {
       {/* --- Stats Dashboard --- */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <GlassCard className="overflow-hidden border-border/70 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-gradient-to-br from-cyan-500/10 to-blue-500/10 dark:from-cyan-500/5 dark:to-blue-500/5">
-            <GlassCardContent className="p-6">
+          
+          {/* Card 1: Patients */}
+          <GlassMorphCard glowColor="cyan" intensity={30}>
+            <div className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Total Patients</p>
@@ -700,11 +703,12 @@ export default function IOSDashboard() {
                   <Users className="h-6 w-6 text-white" />
                 </div>
               </div>
-            </GlassCardContent>
-          </GlassCard>
+            </div>
+          </GlassMorphCard>
 
-          <GlassCard className="overflow-hidden border-border/70 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-gradient-to-br from-purple-500/10 to-pink-500/10 dark:from-purple-500/5 dark:to-pink-500/5">
-            <GlassCardContent className="p-6">
+          {/* Card 2: Appointments */}
+          <GlassMorphCard glowColor="purple" intensity={30}>
+             <div className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Today's Appointments</p>
@@ -716,11 +720,12 @@ export default function IOSDashboard() {
                   <Calendar className="h-6 w-6 text-white" />
                 </div>
               </div>
-            </GlassCardContent>
-          </GlassCard>
+            </div>
+          </GlassMorphCard>
 
-          <GlassCard className="overflow-hidden border-border/70 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-500/5 dark:to-teal-500/5">
-            <GlassCardContent className="p-6">
+          {/* Card 3: Practitioners */}
+          <GlassMorphCard glowColor="green" intensity={30}>
+             <div className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Active Practitioners</p>
@@ -730,11 +735,12 @@ export default function IOSDashboard() {
                   <Activity className="h-6 w-6 text-white" />
                 </div>
               </div>
-            </GlassCardContent>
-          </GlassCard>
+            </div>
+          </GlassMorphCard>
 
-          <GlassCard className="overflow-hidden border-border/70 hover:shadow-xl hover:-translate-y-1 transition-all duration-300 bg-gradient-to-br from-orange-500/10 to-amber-500/10 dark:from-orange-500/5 dark:to-amber-500/5">
-            <GlassCardContent className="p-6">
+          {/* Card 4: Schedules */}
+          <GlassMorphCard glowColor="blue" intensity={30}>
+             <div className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Total Schedules</p>
@@ -744,8 +750,9 @@ export default function IOSDashboard() {
                   <LayoutList className="h-6 w-6 text-white" />
                 </div>
               </div>
-            </GlassCardContent>
-          </GlassCard>
+            </div>
+          </GlassMorphCard>
+
         </div>
       </div>
 
@@ -1183,7 +1190,7 @@ export default function IOSDashboard() {
       )}
 
       {/* --- Quick Actions Floating Button --- */}
-      <div className="fixed right-6 bottom-24 z-40">
+      <div className="fixed right-6 bottom-8 z-40">
         <div className="relative animate-float"> {/* Added animate-float here */}
           {/* Quick actions menu */}
           {showQuickActions && (
