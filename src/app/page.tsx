@@ -5,13 +5,12 @@ import { useTheme } from "next-themes";
 import {
   Search, Filter, ChevronRight, LayoutList, Calendar, Users,
   Activity, RefreshCw, Plus, ArrowUp, ArrowDown, ArrowUpDown,
-  Edit, Trash2, ChevronLeft, Moon, Sun, ChevronDown, ChevronUp
+  Edit, Trash2, ChevronLeft, Moon, Sun, ChevronDown, ChevronUp, MoreHorizontal
 } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
 // --- Ein UI Imports ---
-// Make sure these components are installed in @/components/ui/
 import { GlassCard, GlassCardHeader, GlassCardContent, GlassCardTitle, GlassCardDescription } from "@/components/ui/glass-card";
 import { GlassButton } from "@/components/ui/glass-button";
 import { GlassInput } from "@/components/ui/glass-input";
@@ -51,9 +50,12 @@ function useScrollDirection() {
 const RESOURCES = {
   Patient: {
     label: 'Patients',
+    // Removed "name" from columns to hide the first column ID
+    columns: ['patient_name', 'mobile', 'email'],
     fields: JSON.stringify(["name", "patient_name", "first_name", "last_name", "sex", "mobile", "email", "user_id", "age_html"]),
-    columns: ['name', 'patient_name', 'mobile', 'email'],
     filterableFields: ['sex', 'email'],
+    // Added updateFields to ensure we edit First/Last name specifically
+    updateFields: ['first_name', 'last_name', 'sex', 'mobile', 'email'],
     createFields: ['first_name', 'last_name', 'sex', 'mobile', 'email', 'user_id', 'age'],
     fieldMapping: { age: 'age_html' },
     icon: <Users className="h-5 w-5" />,
@@ -323,7 +325,24 @@ export default function IOSDashboard() {
   };
 
   const openEdit = (row: any) => {
-    setEditFormData({ ...row });
+    // Determine which fields to show in the Edit form
+    const config = RESOURCES[activeTab];
+    // Check for specific updateFields (for Patient first/last name logic) or fall back to createFields/columns
+    const fieldsToEdit = (config as any).updateFields || (config as any).createFields || config.columns;
+    
+    // Filter the row data to only include relevant fields, plus the ID (name)
+    const initialData: any = { name: row.name };
+    fieldsToEdit.forEach((field: string) => {
+        if (row[field] !== undefined) {
+            initialData[field] = row[field];
+        } else {
+             // Handle case where field might be missing in row but needed in form
+            const fieldDef = FIELD_TYPES[field];
+            initialData[field] = fieldDef?.default !== undefined ? fieldDef.default : '';
+        }
+    });
+
+    setEditFormData(initialData);
     setIsEditOpen(true);
     setIsDetailOpen(false);
   };
@@ -379,6 +398,7 @@ export default function IOSDashboard() {
     }
   };
 
+  // --- UPDATED SAVE FUNCTION ---
   const handleSave = async () => {
     const isCreating = isAddOpen;
     const currentData = isCreating ? addFormData : editFormData;
@@ -386,6 +406,13 @@ export default function IOSDashboard() {
     if (!currentData || Object.keys(currentData).length === 0) {
       showToast('error', 'Please fill in the form fields');
       return;
+    }
+
+    // Filter out read-only/system fields for Update
+    let payloadData = { ...currentData };
+    if (!isCreating) {
+      const systemFields = ['creation', 'modified', 'owner', 'docstatus', 'idx', '_user_tags', '_comments', '_assign', '_liked_by'];
+      systemFields.forEach(field => delete payloadData[field]);
     }
 
     try {
@@ -397,7 +424,7 @@ export default function IOSDashboard() {
         body: JSON.stringify({
           resource: activeTab,
           action: isCreating ? 'create' : 'update',
-          data: currentData,
+          data: payloadData,
           name: isCreating ? undefined : currentData.name
         })
       });
@@ -495,8 +522,19 @@ export default function IOSDashboard() {
 
   return (
     <div className="min-h-screen w-full bg-background transition-colors duration-300 pb-32">
+       {/* Inject Floating Animation Styles */}
+       <style jsx global>{`
+        @keyframes float {
+          0% { transform: translateY(0px); }
+          50% { transform: translateY(-8px); }
+          100% { transform: translateY(0px); }
+        }
+        .animate-float {
+          animation: float 4s ease-in-out infinite;
+        }
+      `}</style>
 
-      {/* --- Sticky Header with Enhanced Liquid Glass Effect --- */}
+      {/* --- Sticky Header --- */}
       <header
         className={cn(
           "sticky top-0 z-40 px-6 py-5 transition-transform duration-300 ease-in-out",
@@ -656,7 +694,6 @@ export default function IOSDashboard() {
                   <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Total Patients</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-foreground mt-2">{stats.totalPatients.toLocaleString()}</p>
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                    <ArrowUp className="h-3 w-3" /> +12% from last month
                   </p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-500 flex items-center justify-center shadow-lg">
@@ -673,7 +710,6 @@ export default function IOSDashboard() {
                   <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Today's Appointments</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-foreground mt-2">{stats.todayAppointments}</p>
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1 flex items-center gap-1">
-                    <ArrowUp className="h-3 w-3" /> +5% from yesterday
                   </p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center shadow-lg">
@@ -689,7 +725,6 @@ export default function IOSDashboard() {
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Active Practitioners</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-foreground mt-2">{stats.activePractitioners}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">All systems operational</p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg">
                   <Activity className="h-6 w-6 text-white" />
@@ -704,7 +739,6 @@ export default function IOSDashboard() {
                 <div>
                   <p className="text-sm font-medium text-gray-600 dark:text-muted-foreground">Total Schedules</p>
                   <p className="text-3xl font-bold text-gray-900 dark:text-foreground mt-2">{totalRecords.toLocaleString()}</p>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Across all resources</p>
                 </div>
                 <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-orange-500 to-amber-500 flex items-center justify-center shadow-lg">
                   <LayoutList className="h-6 w-6 text-white" />
@@ -813,7 +847,6 @@ export default function IOSDashboard() {
                       {RESOURCES[activeTab].columns.map(col => (
                         <th
                           key={col}
-                          // Responsive hiding: hide non-essential columns on smaller screens
                           className={cn(
                             "px-4 py-3 font-semibold cursor-pointer hover:text-primary transition-colors whitespace-nowrap",
                             (col === 'mobile' || col === 'email' || col === 'status') && "hidden md:table-cell"
@@ -828,7 +861,7 @@ export default function IOSDashboard() {
                           </div>
                         </th>
                       ))}
-                      <th className="px-4 py-3 text-right w-16">Action</th>
+                      <th className="px-4 py-3 text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -867,8 +900,30 @@ export default function IOSDashboard() {
                             )}
                           </td>
                         ))}
-                        <td className="px-4 py-3 text-right" onClick={() => openDetail(row)}>
-                          <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors inline-block" />
+                        {/* --- NEW: Direct Edit/Delete Buttons in Table Row --- */}
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); openEdit(row); }}
+                              className="p-1.5 hover:bg-primary/10 rounded-full text-gray-500 hover:text-primary transition-colors"
+                              title="Edit"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={(e) => { e.stopPropagation(); setSelectedRow(row); setShowDeleteConfirm(true); }}
+                              className="p-1.5 hover:bg-red-500/10 rounded-full text-gray-500 hover:text-red-600 transition-colors"
+                              title="Delete"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                            <button 
+                              onClick={() => openDetail(row)}
+                              className="p-1.5 hover:bg-gray-100 dark:hover:bg-accent rounded-full text-gray-400 hover:text-gray-900 dark:hover:text-foreground transition-colors"
+                            >
+                              <ChevronRight className="h-4 w-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -884,6 +939,13 @@ export default function IOSDashboard() {
                     onClick={() => openDetail(row)}
                   >
                     <GlassCardContent className="p-4 space-y-2">
+                      <div className="flex justify-between items-start">
+                          <div className="font-bold">{row.name}</div>
+                          <div className="flex gap-2">
+                            <button onClick={(e) => { e.stopPropagation(); openEdit(row); }} className="text-primary"><Edit className="h-4 w-4"/></button>
+                            <button onClick={(e) => { e.stopPropagation(); setSelectedRow(row); setShowDeleteConfirm(true); }} className="text-red-500"><Trash2 className="h-4 w-4"/></button>
+                          </div>
+                      </div>
                       {RESOURCES[activeTab].columns.map(col => (
                         <div key={col} className="flex justify-between items-start border-b border-border/50 pb-2 last:border-0 last:pb-0">
                           <span className="text-[11px] font-bold text-gray-600 dark:text-muted-foreground uppercase tracking-wide">{col.replace(/_/g, ' ')}</span>
@@ -900,10 +962,7 @@ export default function IOSDashboard() {
       </main>
 
       {/* --- Dock Navigation with Toggle (FIXED POSITIONING) --- */}
-      {/* Changed absolute centering to flex centering to avoid transform conflicts with tooltips */}
       <div className="fixed bottom-6 inset-x-0 z-50 flex flex-col items-center gap-3 pointer-events-none">
-
-        {/* The Dock */}
         <div className={cn(
           "pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] origin-bottom",
           showDock ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4 pointer-events-none"
@@ -916,7 +975,6 @@ export default function IOSDashboard() {
           />
         </div>
 
-        {/* Toggle Button - Liquid Glass Styled */}
         <button
           onClick={() => setShowDock(!showDock)}
           className={cn(
@@ -929,7 +987,6 @@ export default function IOSDashboard() {
             "group relative overflow-hidden"
           )}
         >
-           {/* Shimmer Effect Layers */}
           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent translate-x-[-200%] group-hover:translate-x-[200%] transition-transform duration-1000"></div>
           <div className="absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
           
@@ -940,9 +997,9 @@ export default function IOSDashboard() {
         </button>
       </div>
 
-      {/* --- Detail Modal with Tabs --- */}
+      {/* --- Detail Modal with Tabs (FIXED LAYOUT) --- */}
       <GlassDialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <GlassDialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
+        <GlassDialogContent className="max-w-3xl max-h-[85vh] flex flex-col overflow-hidden">
           <GlassDialogHeader>
             <GlassDialogTitle className="text-gray-900 dark:text-foreground">{RESOURCES[activeTab].label} Details</GlassDialogTitle>
             <GlassDialogDescription className="text-gray-600 dark:text-muted-foreground">
@@ -951,7 +1008,7 @@ export default function IOSDashboard() {
           </GlassDialogHeader>
 
           {/* Tabs */}
-          <div className="flex gap-2 border-b border-border/50 px-1">
+          <div className="flex gap-2 border-b border-border/50 px-1 flex-shrink-0">
             <button className="px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary">
               Information
             </button>
@@ -963,8 +1020,8 @@ export default function IOSDashboard() {
             </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-1 glass-scrollbar">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-4">
+          <div className="flex-1 overflow-y-auto p-4 glass-scrollbar min-h-0">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {selectedRow && Object.entries(selectedRow).map(([key, value]) => (
                 <div key={key} className="bg-gray-50 dark:bg-accent/20 p-4 rounded-lg border border-gray-200 dark:border-border hover:shadow-md transition-shadow">
                   <label className="text-xs font-bold text-gray-600 dark:text-muted-foreground uppercase block mb-2 flex items-center gap-2">
@@ -976,7 +1033,9 @@ export default function IOSDashboard() {
               ))}
             </div>
           </div>
-          <GlassDialogFooter className="mt-4 gap-2">
+
+          {/* Sticky Footer for Buttons */}
+          <GlassDialogFooter className="mt-4 gap-2 flex-shrink-0 z-10 bg-white/50 dark:bg-black/20 backdrop-blur-md p-2 rounded-xl">
             <GlassButton variant="destructive" onClick={() => { setIsDetailOpen(false); setShowDeleteConfirm(true); }}>
               <Trash2 className="h-4 w-4 mr-2" /> Delete
             </GlassButton>
@@ -996,11 +1055,13 @@ export default function IOSDashboard() {
             <GlassDialogTitle>{isAddOpen ? 'Create New' : 'Edit'} {RESOURCES[activeTab].label}</GlassDialogTitle>
           </GlassDialogHeader>
 
-          {/* SCROLLABLE AREA with proper height constraints */}
           <div className="flex-1 overflow-y-auto pr-2 py-4 glass-scrollbar max-h-[calc(90vh-180px)]">
             <div className="space-y-4">
               {Object.entries(isAddOpen ? addFormData : editFormData).map(([key, value]) => {
                 const fieldType = FIELD_TYPES[key] || { type: 'text' };
+                // Skip rendering ID field in form (but keep it in state)
+                if (key === 'name' && !isAddOpen) return null; 
+
                 return (
                   <div key={key} className="space-y-2">
                     <label className="text-sm font-medium capitalize text-foreground">{key.replace(/_/g, ' ')}</label>
@@ -1123,43 +1184,50 @@ export default function IOSDashboard() {
 
       {/* --- Quick Actions Floating Button --- */}
       <div className="fixed right-6 bottom-24 z-40">
-        <div className="relative">
+        <div className="relative animate-float"> {/* Added animate-float here */}
           {/* Quick actions menu */}
           {showQuickActions && (
-            <div className="absolute bottom-16 right-0 flex flex-col gap-2 animate-in slide-in-from-bottom-4 fade-in duration-200">
+            <div className="absolute bottom-20 right-0 flex flex-col gap-3 animate-in slide-in-from-bottom-4 fade-in duration-300">
               <button
                 onClick={() => { setActiveTab('Patient'); setShowQuickActions(false); openAdd(); }}
-                className="flex items-center gap-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-gray-200 dark:border-border/50 rounded-full px-4 py-2 shadow-xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
+                className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-white/20 rounded-2xl px-5 py-3 shadow-2xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
               >
-                <Users className="h-4 w-4" />
-                <span className="text-sm font-medium whitespace-nowrap">New Patient</span>
+                <Users className="h-5 w-5 text-blue-500" />
+                <span className="text-sm font-bold whitespace-nowrap">New Patient</span>
               </button>
               <button
                 onClick={() => { setActiveTab('Patient Appointment'); setShowQuickActions(false); openAdd(); }}
-                className="flex items-center gap-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-gray-200 dark:border-border/50 rounded-full px-4 py-2 shadow-xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
+                className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-white/20 rounded-2xl px-5 py-3 shadow-2xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
               >
-                <Calendar className="h-4 w-4" />
-                <span className="text-sm font-medium whitespace-nowrap">New Appointment</span>
+                <Calendar className="h-5 w-5 text-purple-500" />
+                <span className="text-sm font-bold whitespace-nowrap">New Appointment</span>
               </button>
               <button
                 onClick={() => { fetchData(); fetchStats(); setShowQuickActions(false); showToast('success', 'Data refreshed!'); }}
-                className="flex items-center gap-3 bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-gray-200 dark:border-border/50 rounded-full px-4 py-2 shadow-xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
+                className="flex items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-white/40 dark:border-white/20 rounded-2xl px-5 py-3 shadow-2xl hover:scale-105 transition-transform text-gray-900 dark:text-foreground group"
               >
-                <RefreshCw className="h-4 w-4" />
-                <span className="text-sm font-medium whitespace-nowrap">Refresh All</span>
+                <RefreshCw className="h-5 w-5 text-emerald-500" />
+                <span className="text-sm font-bold whitespace-nowrap">Refresh All</span>
               </button>
             </div>
           )}
 
-          {/* Main FAB */}
+          {/* Main FAB - Lively Liquid Glass Design */}
           <button
             onClick={() => setShowQuickActions(!showQuickActions)}
             className={cn(
-              "h-14 w-14 rounded-full bg-gradient-to-br from-primary to-blue-600 flex items-center justify-center shadow-2xl hover:scale-110 transition-all text-white",
-              showQuickActions && "rotate-45"
+              "h-16 w-16 rounded-[24px] flex items-center justify-center transition-all duration-500",
+              "bg-gradient-to-br from-blue-500/80 via-purple-500/80 to-pink-500/80",
+              "backdrop-blur-2xl border border-white/40",
+              "shadow-[0_8px_32px_0_rgba(31,38,135,0.37)]", // Deep glass shadow
+              "hover:scale-110 hover:shadow-[0_8px_40px_0_rgba(31,38,135,0.5)]",
+              "text-white",
+              "before:absolute before:inset-0 before:bg-gradient-to-t before:from-black/10 before:to-transparent before:rounded-[24px]",
+              "after:absolute after:top-0 after:left-0 after:right-0 after:h-1/2 after:bg-gradient-to-b after:from-white/30 after:to-transparent after:rounded-t-[24px]",
+              showQuickActions && "rotate-45 bg-red-500/80 from-red-500/80 to-orange-500/80"
             )}
           >
-            <Plus className="h-6 w-6" />
+            <Plus className={cn("h-8 w-8 relative z-10 drop-shadow-md transition-transform duration-300", showQuickActions ? "rotate-90" : "rotate-0")} />
           </button>
         </div>
       </div>
