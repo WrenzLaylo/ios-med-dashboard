@@ -7,6 +7,7 @@ import { DashboardHeader } from '@/components/dashboard/header';
 import { StatsOverview } from '@/components/dashboard/stats-cards';
 import { DataView } from '@/components/dashboard/data-view';
 import { DashboardModals } from '@/components/dashboard/dashboard-modals';
+import { AIChatbot } from '@/components/ai-chatbot';
 import { GlassDock } from "@/components/glass-dock";
 import { GlassRippleButton } from "@/components/glass-ripple";
 import { ChevronDown, ChevronUp, Plus, Users, Calendar, RefreshCw } from 'lucide-react';
@@ -78,6 +79,9 @@ export default function IOSDashboard() {
 
       <DashboardModals {...dashboard} handleDelete={dashboard.handleDelete} />
 
+      {/* AI Chatbot - positioned on bottom left */}
+      <AIChatbot />
+
       {/* Dock Navigation */}
       <div className="fixed bottom-6 inset-x-0 z-50 flex flex-col items-center gap-3 pointer-events-none">
         <div className={cn("pointer-events-auto transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] origin-bottom", dashboard.showDock ? "opacity-100 scale-100 translate-y-0" : "opacity-0 scale-95 translate-y-4 pointer-events-none")}>
@@ -88,7 +92,7 @@ export default function IOSDashboard() {
         </button>
       </div>
 
-      {/* Floating Action Button */}
+      {/* Floating Action Button - positioned on bottom right */}
       <div className="fixed right-6 bottom-8 z-40 pointer-events-auto">
         <div className="relative animate-float">
           {dashboard.showQuickActions && (
