@@ -13,7 +13,8 @@ export function useDashboard() {
   const [activeFilters, setActiveFilters] = useState<Record<string, string>>({});
   const [sortConfig, setSortConfig] = useState<SortConfig>(null);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  
+  const [showChat, setShowChat] = useState(false);
+
   // UI States
   const [viewMode, setViewMode] = useState<'table' | 'card'>('table');
   const [showFilters, setShowFilters] = useState(false);
@@ -80,7 +81,7 @@ export function useDashboard() {
         fetch(`/api/proxy?resource=Healthcare Practitioner&fields=["name","status"]&limit_page_length=99999`)
       ]);
       const [pData, aData, drData] = await Promise.all([pRes.json(), aRes.json(), drRes.json()]);
-      
+
       const today = new Date().toISOString().split('T')[0];
       setStats({
         totalPatients: pData.data?.length || 0,
@@ -144,14 +145,14 @@ export function useDashboard() {
   };
 
   const openDetail = (row: any) => { setSelectedRow(row); setIsDetailOpen(true); };
-  
+
   const openEdit = (row: any) => {
     const config = RESOURCES[activeTab];
     // @ts-ignore
     const fieldsToEdit = config.updateFields || config.createFields || config.columns;
     const initialData: any = { name: row.name };
     fieldsToEdit.forEach((field: string) => {
-       initialData[field] = row[field] !== undefined ? row[field] : (FIELD_TYPES[field]?.default ?? '');
+      initialData[field] = row[field] !== undefined ? row[field] : (FIELD_TYPES[field]?.default ?? '');
     });
     setEditFormData(initialData);
     setIsEditOpen(true);
@@ -223,17 +224,17 @@ export function useDashboard() {
   return {
     // State
     activeTab, setActiveTab, data, loading, searchTerm, setSearchTerm,
-    debouncedSearchTerm, activeFilters, setActiveFilters, sortConfig,
+    debouncedSearchTerm, activeFilters, setActiveFilters, sortConfig, showChat, setShowChat,
     selectedRows, setSelectedRows, viewMode, setViewMode, showFilters, setShowFilters,
     showDock, setShowDock, showQuickActions, setShowQuickActions,
     selectedRow, setSelectedRow, isDetailOpen, setIsDetailOpen,
     isEditOpen, setIsEditOpen, isAddOpen, setIsAddOpen, showDeleteConfirm, setShowDeleteConfirm,
     editFormData, setEditFormData, addFormData, setAddFormData, patientList,
     currentPage, setCurrentPage, totalRecords, stats, pageSize, toastMessage,
-    
+
     // Derived
     filteredAndSortedData,
-    
+
     // Actions
     fetchData, fetchStats, handleSort, toggleRowSelection, openDetail, openEdit, openAdd,
     handleSave, handleDelete, handleBatchDelete, showToast

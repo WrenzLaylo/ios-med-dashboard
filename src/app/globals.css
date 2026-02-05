@@ -47,160 +47,176 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.129 0.042 264.695);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.129 0.042 264.695);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.129 0.042 264.695);
-  --primary: oklch(0.208 0.042 265.755);
-  --primary-foreground: oklch(0.984 0.003 247.858);
-  --secondary: oklch(0.968 0.007 247.896);
-  --secondary-foreground: oklch(0.208 0.042 265.755);
-  --muted: oklch(0.968 0.007 247.896);
-  --muted-foreground: oklch(0.554 0.046 257.417);
-  --accent: oklch(0.968 0.007 247.896);
-  --accent-foreground: oklch(0.208 0.042 265.755);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.929 0.013 255.508);
-  --input: oklch(0.929 0.013 255.508);
-  --ring: oklch(0.704 0.04 256.788);
+  --radius: 0.75rem;
+  
+  /* LIGHT MODE COLORS - Enhanced for better readability */
+  --background: 0 0% 100%; /* Pure white */
+  --foreground: 222 47% 11%; /* Very dark slate */
+  --card: 0 0% 100%;
+  --card-foreground: 222 47% 11%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 222 47% 11%;
+  --primary: 221 83% 53%; /* Vibrant blue */
+  --primary-foreground: 0 0% 100%;
+  --secondary: 210 40% 96%;
+  --secondary-foreground: 222 47% 11%;
+  --muted: 210 40% 96%;
+  --muted-foreground: 215 16% 47%; /* Medium gray for better contrast */
+  --accent: 210 40% 96%;
+  --accent-foreground: 222 47% 11%;
+  --destructive: 0 84% 60%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 214 32% 91%; /* Slightly darker border */
+  --input: 214 32% 91%;
+  --ring: 221 83% 53%;
+  
+  /* Light Mode Glass Variables */
+  --glass-border: rgba(0, 0, 0, 0.12);
+  --glass-bg: rgba(255, 255, 255, 0.85); 
+  --glass-blur: 12px;
+
+  /* Chart colors */
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.984 0.003 247.858);
-  --sidebar-foreground: oklch(0.129 0.042 264.695);
-  --sidebar-primary: oklch(0.208 0.042 265.755);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.968 0.007 247.896);
-  --sidebar-accent-foreground: oklch(0.208 0.042 265.755);
-  --sidebar-border: oklch(0.929 0.013 255.508);
-  --sidebar-ring: oklch(0.704 0.04 256.788);
+  
+  /* Sidebar colors */
+  --sidebar: 0 0% 100%;
+  --sidebar-foreground: 222 47% 11%;
+  --sidebar-primary: 221 83% 53%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent: 210 40% 96%;
+  --sidebar-accent-foreground: 222 47% 11%;
+  --sidebar-border: 214 32% 91%;
+  --sidebar-ring: 221 83% 53%;
 }
 
 .dark {
-  --background: oklch(0.129 0.042 264.695);
-  --foreground: oklch(0.984 0.003 247.858);
-  --card: oklch(0.208 0.042 265.755);
-  --card-foreground: oklch(0.984 0.003 247.858);
-  --popover: oklch(0.208 0.042 265.755);
-  --popover-foreground: oklch(0.984 0.003 247.858);
-  --primary: oklch(0.929 0.013 255.508);
-  --primary-foreground: oklch(0.208 0.042 265.755);
-  --secondary: oklch(0.279 0.041 260.031);
-  --secondary-foreground: oklch(0.984 0.003 247.858);
-  --muted: oklch(0.279 0.041 260.031);
-  --muted-foreground: oklch(0.704 0.04 256.788);
-  --accent: oklch(0.279 0.041 260.031);
-  --accent-foreground: oklch(0.984 0.003 247.858);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.551 0.027 264.364);
+  /* DARK MODE COLORS */
+  --background: 222 84% 5%; /* Deep slate */
+  --foreground: 210 40% 98%;
+  --card: 222 47% 11%;
+  --card-foreground: 210 40% 98%;
+  --popover: 222 47% 11%;
+  --popover-foreground: 210 40% 98%;
+  --primary: 217 91% 60%; /* Bright blue */
+  --primary-foreground: 222 47% 11%;
+  --secondary: 217 33% 17%;
+  --secondary-foreground: 210 40% 98%;
+  --muted: 217 33% 17%;
+  --muted-foreground: 215 20% 65%;
+  --accent: 217 33% 17%;
+  --accent-foreground: 210 40% 98%;
+  --destructive: 0 63% 31%;
+  --destructive-foreground: 210 40% 98%;
+  --border: 217 33% 17%;
+  --input: 217 33% 17%;
+  --ring: 224 77% 63%;
+  
+  /* Dark Mode Glass Variables */
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --glass-bg: rgba(15, 23, 42, 0.7); 
+  --glass-blur: 16px;
+
+  /* Chart colors - dark mode */
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.208 0.042 265.755);
-  --sidebar-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-accent: oklch(0.279 0.041 260.031);
-  --sidebar-accent-foreground: oklch(0.984 0.003 247.858);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.551 0.027 264.364);
+  
+  /* Sidebar colors - dark mode */
+  --sidebar: 222 47% 11%;
+  --sidebar-foreground: 210 40% 98%;
+  --sidebar-primary: 217 91% 60%;
+  --sidebar-primary-foreground: 222 47% 11%;
+  --sidebar-accent: 217 33% 17%;
+  --sidebar-accent-foreground: 210 40% 98%;
+  --sidebar-border: 217 33% 17%;
+  --sidebar-ring: 224 77% 63%;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
+  
   body {
-    @apply bg-background text-foreground;
-  }
-}
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    /* Liquid Glass Variables - Optimized for Dark Mode */
-    --glass-bg: rgba(255, 255, 255, 0.03);
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-blur: 16px;
-    
-    /* Neon Glows */
-    --glow-cyan: rgba(6, 182, 212, 0.4);
-    --glow-purple: rgba(147, 51, 234, 0.4);
-    --glow-pink: rgba(236, 72, 153, 0.4);
-
-    /* Text Colors for Contrast */
-    --text-primary: rgba(255, 255, 255, 0.95);
-    --text-secondary: rgba(148, 163, 184, 1); /* Slate-400 */
-    --text-muted: rgba(255, 255, 255, 0.4);
-    
-    --background: 222.2 84% 4.9%; /* Slate 950 */
-    --foreground: 210 40% 98%;
+    @apply bg-background text-foreground antialiased transition-colors duration-300;
   }
 
-  /* The "Dark-First" Background */
-  body {
-    @apply bg-slate-950 text-slate-100 antialiased;
+  /* Light Mode Background Gradient */
+  body:not(.dark) {
+    background: linear-gradient(
+      to bottom right,
+      hsl(210, 40%, 98%) 0%,
+      hsl(214, 32%, 95%) 50%,
+      hsl(210, 40%, 98%) 100%
+    );
+    background-attachment: fixed;
+  }
+
+  /* Dark Mode Background Gradient */
+  body.dark {
     background-image: 
       radial-gradient(at 0% 0%, rgba(56, 189, 248, 0.15) 0px, transparent 50%),
       radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.15) 0px, transparent 50%);
     background-attachment: fixed;
+    background-color: hsl(222, 84%, 5%);
   }
 }
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-@layer base {
-  :root {
-    /* LIGHT MODE VARIABLES */
-    --background: 210 40% 98%; /* Light Grey */
-    --foreground: 222.2 84% 4.9%; /* Dark Slate */
-    
-    --glass-border: rgba(0, 0, 0, 0.08);
-    --glass-bg: rgba(255, 255, 255, 0.6); 
-    --glass-blur: 8px; /* Reduced for performance */
-  }
-
-  .dark {
-    /* DARK MODE VARIABLES */
-    --background: 222.2 84% 4.9%; /* Deep Slate */
-    --foreground: 210 40% 98%; /* White */
-    
-    --glass-border: rgba(255, 255, 255, 0.08);
-    --glass-bg: rgba(15, 23, 42, 0.6); 
-    --glass-blur: 12px;
-  }
-
-  body {
-    @apply bg-background text-foreground antialiased transition-colors duration-300;
-  }
-}
-
-/* Custom Glass Scrollbar */
+/* Custom Glass Scrollbar - Light & Dark Mode */
 .glass-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 8px;
+  height: 8px;
 }
+
 .glass-scrollbar::-webkit-scrollbar-track {
   background: transparent;
 }
-.glass-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(156, 163, 175, 0.5);
+
+/* Light mode scrollbar */
+:not(.dark) .glass-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
   border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
-.glass-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(156, 163, 175, 0.8);
+
+:not(.dark) .glass-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.35);
+  background-clip: content-box;
+}
+
+/* Dark mode scrollbar */
+.dark .glass-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+
+.dark .glass-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.35);
+  background-clip: content-box;
+}
+
+/* Better focus visible states for accessibility */
+*:focus-visible {
+  @apply outline-2 outline-offset-2 outline-primary;
+}
+
+/* Smooth transitions for theme switching */
+* {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Disable transitions for elements that shouldn't animate on theme change */
+button, a, input, select, textarea {
+  transition-property: background-color, border-color, transform, opacity;
 }

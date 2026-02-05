@@ -115,11 +115,17 @@ export function AIChatbot() {
   const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setInputMessage(e.target.value);
     
-    // Auto-resize textarea
+    // Auto-resize textarea - shrinks when content is removed
     const textarea = e.target;
+    // Reset to minimum height first to get accurate scrollHeight
     textarea.style.height = '44px';
-    const scrollHeight = textarea.scrollHeight;
-    textarea.style.height = Math.min(scrollHeight, 100) + 'px';
+    
+    // If there's content, resize based on scroll height
+    if (e.target.value) {
+      const scrollHeight = textarea.scrollHeight;
+      textarea.style.height = Math.min(scrollHeight, 120) + 'px';
+    }
+    // If empty, keep at minimum height (already set to 44px above)
   };
 
   const formatTime = (date: Date) => {
@@ -128,6 +134,57 @@ export function AIChatbot() {
 
   return (
     <>
+      <style jsx global>{`
+        /* Glass Scrollbar Styling */
+        .glass-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        
+        .glass-scrollbar::-webkit-scrollbar-track {
+          background: rgba(255, 255, 255, 0.05);
+          border-radius: 10px;
+          margin: 4px;
+        }
+        
+        .glass-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.3);
+          border-radius: 10px;
+          border: 2px solid transparent;
+          background-clip: padding-box;
+          backdrop-filter: blur(10px);
+        }
+        
+        .glass-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(148, 163, 184, 0.5);
+          border: 2px solid transparent;
+          background-clip: padding-box;
+        }
+        
+        /* Dark mode scrollbar */
+        .dark .glass-scrollbar::-webkit-scrollbar-track {
+          background: rgba(0, 0, 0, 0.2);
+        }
+        
+        .dark .glass-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(100, 116, 139, 0.4);
+          backdrop-filter: blur(10px);
+        }
+        
+        .dark .glass-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(100, 116, 139, 0.6);
+        }
+
+        /* Firefox scrollbar */
+        .glass-scrollbar {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(148, 163, 184, 0.3) rgba(255, 255, 255, 0.05);
+        }
+
+        .dark .glass-scrollbar {
+          scrollbar-color: rgba(100, 116, 139, 0.4) rgba(0, 0, 0, 0.2);
+        }
+      `}</style>
+
       {/* Chat Window - Bottom Left */}
       <div className={cn(
         "fixed left-4 md:left-6 z-[45] transition-all duration-300 ease-out",
@@ -187,7 +244,7 @@ export function AIChatbot() {
           {/* Messages Area */}
           {!isMinimized && (
             <>
-              <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-gradient-to-b from-gray-50 to-white dark:from-slate-950 dark:to-slate-900">
+              <div className="flex-1 overflow-y-auto p-3 md:p-4 space-y-3 bg-gradient-to-b from-gray-50 to-white dark:from-slate-950 dark:to-slate-900 glass-scrollbar">
                 {messages.map((msg, idx) => (
                   <div 
                     key={idx} 
@@ -212,7 +269,7 @@ export function AIChatbot() {
 
                     {/* Message Bubble */}
                     <div className={cn(
-                      "flex flex-col gap-0.5 max-w-[75%]",
+                      "flex flex-col gap-0.5 max-w-[80%]",
                       msg.role === 'user' ? 'items-end' : 'items-start'
                     )}>
                       <div className={cn(
@@ -221,7 +278,9 @@ export function AIChatbot() {
                           ? 'bg-gradient-to-br from-teal-500 to-emerald-600 text-white rounded-tr-sm' 
                           : 'bg-white dark:bg-slate-800 text-gray-900 dark:text-gray-100 rounded-tl-sm border border-gray-200 dark:border-slate-700'
                       )}>
-                        <p className="whitespace-pre-wrap break-words">{msg.content}</p>
+                        <p className="whitespace-pre-wrap break-words overflow-wrap-anywhere hyphens-auto">
+                          {msg.content}
+                        </p>
                       </div>
                       <span className="text-[10px] text-gray-400 dark:text-gray-500 px-1.5">
                         {formatTime(msg.timestamp)}
@@ -253,19 +312,32 @@ export function AIChatbot() {
               <div className="shrink-0 p-3 border-t border-border/40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl">
                 <div className="relative flex items-end gap-2">
                   <div className="flex-1 relative">
+                    {/* Glass Morphism Textarea */}
                     <textarea
                       ref={inputRef}
                       value={inputMessage}
                       onChange={handleTextareaChange}
                       onKeyDown={handleKeyPress}
-                      placeholder="Type your message..."
+                      placeholder="Type your message here..."
                       rows={1}
                       disabled={isLoading}
-                      className="w-full resize-none rounded-xl md:rounded-2xl border border-gray-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2.5 text-[13px] md:text-sm placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      className={cn(
+                        "w-full resize-none rounded-xl md:rounded-2xl px-3 py-2.5 text-[13px] md:text-sm",
+                        "bg-white/60 dark:bg-slate-800/60 backdrop-blur-md",
+                        "border border-gray-200/60 dark:border-slate-700/60",
+                        "placeholder:text-gray-400/70 dark:placeholder:text-gray-500/70",
+                        "text-gray-900 dark:text-gray-100",
+                        "shadow-sm shadow-black/5",
+                        "transition-all duration-200",
+                        "focus:outline-none focus:ring-2 focus:ring-blue-500/50 focus:border-blue-500/50",
+                        "focus:bg-white/80 dark:focus:bg-slate-800/80",
+                        "disabled:opacity-50 disabled:cursor-not-allowed",
+                        "glass-scrollbar"
+                      )}
                       style={{ 
-                        height: '40px',
-                        maxHeight: '100px',
-                        minHeight: '40px'
+                        height: '44px',
+                        maxHeight: '120px',
+                        minHeight: '44px'
                       }}
                     />
                   </div>
